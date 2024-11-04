@@ -4,7 +4,6 @@ from pathlib import Path
 from typing import List, Dict, Optional
 from rich.console import Console
 from rich.table import Table
-from rich.panel import Panel
 from rich import print as rprint
 from rich.prompt import Prompt
 
@@ -13,13 +12,13 @@ class FileTools:
         self.console = Console()
         self.tools_dir = Path('/workspace/file-scripts/tools')
         self.tools = [
-            ('remove_configs.py', 'Remove configuration files', 'rc'),
-            ('download_configs.py', 'Download configurations to Dropbox', 'dc'),
-            ('delete_models.py', 'Remove model files and associated data', 'dm'),
-            ('remove_dataset_json.py', 'Clean up dataset JSON files', 'rj'),
-            ('remove_dataset_cache.py', 'Clear dataset cache directories', 'rd'),
-            ('remove_checkpoints.py', 'Delete .ipynb_checkpoints directories', 'cp'),
-            ('debug_crops.py', 'Run image preparation debug routine', 'db')
+            ('remove_configs', 'Remove configuration files', 'rc'),
+            ('download_configs', 'Download configurations to Dropbox', 'dc'),
+            ('delete_models', 'Remove model files and associated data', 'dm'),
+            ('remove_dataset_json', 'Clean up dataset JSON files', 'rj'),
+            ('remove_dataset_cache', 'Clear dataset cache directories', 'rd'),
+            ('remove_checkpoints', 'Delete .ipynb_checkpoints directories', 'cp'),
+            ('debug_crops', 'Run image preparation debug routine', 'db')
         ]
         
     def clear_screen(self):
@@ -35,59 +34,36 @@ class FileTools:
 
     def display_menu(self) -> None:
         """Display the main menu of available tools."""
-        # Create main tools table
-        tools_table = Table(
-            show_header=False,
+        rprint("[magenta]=== File Management Tools ===[/magenta]\n")
+        
+        # Create main tools table with borders
+        table = Table(
+            show_header=True,
             box=None,
-            padding=(0, 2),
-            title="[magenta]File Management Tools[/magenta]",
-            title_style="bold magenta"
+            padding=(0, 2)
         )
-        tools_table.add_column("Number", style="yellow", width=4)
-        tools_table.add_column("Tool", style="cyan", width=30)
-        tools_table.add_column("Description", style="white")
+        
+        # Add columns with headers
+        table.add_column(
+            "[cyan]Available Tools[/cyan]",
+            style="white",
+            width=40
+        )
+        table.add_column(
+            "[cyan]Shortcuts[/cyan]",
+            style="white",
+            width=10,
+            justify="left"
+        )
         
         # Add tools to table
-        for idx, (filename, description, shortcut) in enumerate(self.tools, 1):
-            tools_table.add_row(
-                f"{idx}.",
-                filename.replace('.py', ''),
-                description
-            )
+        for idx, (name, _, shortcut) in enumerate(self.tools, 1):
+            tool_cell = f"[yellow]{idx}.[/yellow] [cyan]{name}[/cyan]"
+            shortcut_cell = f"[yellow]{shortcut}[/yellow]"
+            table.add_row(tool_cell, shortcut_cell)
         
-        # Create shortcuts table
-        shortcuts_table = Table(
-            show_header=False,
-            box=None,
-            padding=(0, 2),
-            title="\n[blue]Shortcuts[/blue]",
-            title_style="bold blue"
-        )
-        shortcuts_table.add_column("Shortcut", style="yellow", width=12)
-        shortcuts_table.add_column("Description", style="white")
-        
-        # Add shortcuts in rows of three
-        shortcuts = [(f"[yellow]{sc}[/yellow]", f"{desc}") 
-                    for _, desc, sc in self.tools]
-        
-        for i in range(0, len(shortcuts), 3):
-            row = shortcuts[i:i+3]
-            while len(row) < 3:
-                row.append(("", ""))
-            shortcuts_table.add_row(
-                f"{row[0][0]}: {row[0][1]}",
-                f"{row[1][0]}: {row[1][1]}",
-                f"{row[2][0]}: {row[2][1]}"
-            )
-        
-        # Create main panel with both tables
-        panel = Panel(
-            f"{tools_table}\n{shortcuts_table}",
-            border_style="blue",
-            padding=(1, 2)
-        )
-        
-        self.console.print(panel)
+        # Print tools table
+        self.console.print(table)
 
     def run_tool(self, tool_name: str) -> None:
         """Run a specific tool."""
@@ -118,19 +94,19 @@ class FileTools:
             self.display_menu()
             
             choice = Prompt.ask(
-                "\nEnter tool number, shortcut, or 'q' to quit",
-                default="q"
+                "\nSelect Tool # or shortcut (press Enter to exit)",
+                default=""
             ).strip().lower()
             
-            if choice == 'q':
+            if choice == '':
                 rprint("\n[yellow]Exiting File Management Tools...[/yellow]")
                 break
             
             # Check if input is a shortcut
             shortcut_match = None
-            for filename, _, shortcut in self.tools:
+            for name, _, shortcut in self.tools:
                 if choice == shortcut:
-                    shortcut_match = filename.replace('.py', '')
+                    shortcut_match = name
                     break
             
             if shortcut_match:
@@ -144,7 +120,7 @@ class FileTools:
             try:
                 choice_num = int(choice)
                 if 1 <= choice_num <= len(self.tools):
-                    tool_name = self.tools[choice_num - 1][0].replace('.py', '')
+                    tool_name = self.tools[choice_num - 1][0]
                     self.clear_screen()
                     self.run_tool(tool_name)
                     input("\nPress Enter to continue...")
@@ -152,7 +128,8 @@ class FileTools:
                 else:
                     rprint("[red]Invalid selection. Please try again.[/red]")
             except ValueError:
-                rprint("[red]Invalid input. Please enter a number, shortcut, or 'q' to quit.[/red]")
+                if choice != '':  # Don't show error for empty input (exit)
+                    rprint("[red]Invalid input. Please enter a tool number or shortcut.[/red]")
 
 if __name__ == "__main__":
     tools = FileTools()
