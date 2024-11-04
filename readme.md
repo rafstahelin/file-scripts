@@ -1,96 +1,102 @@
-Config Manager v1.0-release
-A command-line tool for managing configuration folders and datasets efficiently. The Config Manager simplifies the process of creating new configurations based on existing ones or templates, ensuring consistency and reducing manual effort.
+# File Management Scripts
 
-Table of Contents
-Features
-Requirements
-Installation
-Usage
-Examples
-License
-Features
-Interactive CLI: User-friendly command-line interface for easy navigation.
-Folder Management: Create new configuration folders based on existing ones or predefined templates.
-Dataset Selection: Choose datasets from available options, grouped and displayed neatly.
-Automated Updates: Automatically update configuration files with new token names and versions.
-Cross-Platform Support: Works on Unix-like systems and Windows.
-Requirements
-Python 3.6 or higher
-Rich library for enhanced console output
-Installation
-Clone the repository (if applicable) or download the config_manager.py script.
+[![Version](https://img.shields.io/badge/version-0.2.0--dev-orange)](#) [![License](https://img.shields.io/badge/license-MIT-blue.svg)](#license)
 
-Install the required Python package:
+A collection of utility scripts for managing and processing files in AI model development workflows.
 
-bash
-Copy code
-pip install rich
-Usage
-Run the script from the command line:
+## Table of Contents
+- [Overview](#overview)
+- [Scripts](#scripts)
+  - [Config Manager](#config-manager)
+  - [LoRA Model Manager](#lora-model-manager)
+- [Installation](#installation)
+- [Requirements](#requirements)
+- [Development](#development)
+- [License](#license)
 
-bash
-Copy code
+## Overview
+This repository contains utility scripts designed to streamline file management tasks in AI model development workflows. Current tools include configuration management and LoRA model file organization.
+
+## Scripts
+
+### Config Manager
+A command-line tool for managing configuration folders and datasets efficiently.
+
+#### Features
+- Interactive CLI with user-friendly navigation
+- Create configurations from existing folders or templates
+- Automated dataset management
+- Cross-platform support
+- Configuration file auto-updating
+
+#### Usage
+```bash
 python config_manager.py
-Follow the on-screen prompts to create or manage configuration folders.
+```
 
-Steps:
-Select Source Folder Type:
+[Detailed Config Manager Documentation](docs/config_manager.md)
 
-Use an existing folder.
-Use the 'lora' template.
-Use the 'lokr' template.
-Select Source Folder or Enter Token Name:
+### LoRA Model Manager
+A comprehensive tool for managing LoRA model files with features for renaming, organizing, and syncing to cloud storage.
 
-If using an existing folder, select from the displayed list.
-If using a template, enter the new token name.
-Enter Version Number:
+#### Features
+- Process single or multiple model versions
+- Automatic file renaming with consistent patterns
+- Cloud synchronization with Dropbox
+- Interactive CLI with visual progress tracking
+- Error handling and validation
 
-Specify the new version number for the configuration.
-Select Dataset:
+#### Usage
+```bash
+python lora_mover.py
+```
 
-Choose whether to use the same dataset or select a new one from the displayed list.
-Confirm and Proceed:
+[Detailed LoRA Model Manager Documentation](docs/lora_mover.md)
 
-Review the parameters and confirm to proceed.
-The script will copy files and update configuration files automatically.
-Examples
-Creating a New Configuration from an Existing Folder
-plaintext
-Copy code
-=== Configuration Folder Management Tool ===
+## Installation
 
-Select source folder type:
-1. Use existing folder
-2. Use 'lora' template
-3. Use 'lokr' template
-Enter choice: 1
+1. Clone the repository:
+```bash
+git clone https://github.com/rafstahelin/file-scripts.git
+cd file-scripts
+```
 
-Existing folders:
-[Displays folders in organized panels]
+2. Install required packages:
+```bash
+pip install rich
+```
 
-Enter number to select source folder: 3
-Enter new version number: 04
-Use same dataset? [y/n]: n
+3. Configure required services:
+- Rclone with Dropbox access (for LoRA Model Manager)
 
-Available datasets:
-[Displays datasets in organized panels]
+## Requirements
+- Python 3.6 or higher
+- rich library for enhanced console output
+- rclone (for cloud sync features)
 
-Enter dataset number: 6
+## Development
 
-Processing with following parameters:
-Source Directory: lora-03
-Token Name: lora
-New Version: 04
-New Folder Name: lora-04
-Dataset: lulu-15
+### Current Status
+- Version: 0.2.0-dev
+- Branch: dev
 
-Proceed? [y/n]: y
+### Versioning
+We use [Semantic Versioning](https://semver.org/):
+- MAJOR.MINOR.PATCH (e.g., 1.0.0)
+- Development versions append `-dev` (e.g., 0.2.0-dev)
+- Beta versions append `-beta` (e.g., 0.2.0-beta)
 
-Copying files...
-Updating configuration files...
+### Branches
+- `main`: Production-ready code
+- `dev`: Development branch for ongoing work
 
-Operation completed successfully!
+### Contributing
+1. Fork the repository
+2. Create your feature branch: `git checkout -b feature/my-new-feature`
+3. Commit your changes: `git commit -am 'Add some feature'`
+4. Push to the branch: `git push origin feature/my-new-feature`
+5. Submit a pull request
 
-Created new configuration in: lora-04
-License
-This project is licensed under the MIT License. See the LICENSE file for details.
+## License
+
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.

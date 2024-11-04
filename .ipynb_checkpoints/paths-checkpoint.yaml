@@ -1,0 +1,6 @@
+{
+    "lulu": {
+        "libs": "dbx:/studio/ai/libs/SD/loras/1subject/l0l0",
+        "data": "dbx:/studio/ai/data/1subjects/012-LuluWood"
+    }
+}
