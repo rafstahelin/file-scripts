@@ -18,7 +18,10 @@ from rich.prompt import Prompt
 class ConfigManager:
     def __init__(self):
         self.console = Console()
-
+        # Using absolute path to templates directory
+        self.templates_path = Path('/workspace/SimpleTuner/config/templates')
+        self.root_path = Path('/workspace/SimpleTuner/config')
+        
     def clear_screen(self):
         os.system('clear' if os.name == 'posix' else 'cls')
 
@@ -63,7 +66,7 @@ class ConfigManager:
                 print(f"{prompt_text} [y/n]: ", end='', flush=True)
 
     def list_folders(self) -> list:
-        folders = [f for f in Path().iterdir() if f.is_dir() and f.name not in ['lora', 'lokr', '.ipynb_checkpoints']]
+        folders = [f for f in self.root_path.iterdir() if f.is_dir() and f.name not in ['templates', '.ipynb_checkpoints']]
         # Group folders by base name
         grouped = {}
         for folder in folders:
@@ -103,9 +106,60 @@ class ConfigManager:
         for row in panel_rows:
             self.console.print(Columns(row, equal=True, expand=True))
         return ordered_folders
+        
+    def list_templates(self) -> list:
+        """List template folders from the templates directory."""
+        if not self.templates_path.exists():
+            rprint(f"[yellow]Warning: Templates directory {self.templates_path} not found.[/yellow]")
+            return []
+
+        templates = [f for f in self.templates_path.iterdir() if f.is_dir() and f.name != '.ipynb_checkpoints']
+        
+        # Group templates by base name
+        grouped = {}
+        for template in templates:
+            base_name = template.name.split('-', 1)[0]
+            grouped.setdefault(base_name, []).append(template.name)
+
+        # Prepare indices and template list
+        template_indices = {}
+        index = 1
+        ordered_templates = []
+        for base_name in sorted(grouped.keys()):
+            names_in_group = sorted(grouped[base_name], key=lambda x: x.lower(), reverse=True)
+            template_indices[base_name] = {}
+            for name in names_in_group:
+                template_indices[base_name][name] = index
+                ordered_templates.append(name)
+                index += 1
+
+        # Create panels for each group
+        panels = []
+        for base_name in sorted(grouped.keys()):
+            table = Table(show_header=False, show_edge=False, box=None, padding=(0,1))
+            table.add_column(justify="left", no_wrap=False, overflow='fold', max_width=30)
+            names_in_group = sorted(grouped[base_name], key=lambda x: x.lower(), reverse=True)
+            for name in names_in_group:
+                idx = template_indices[base_name][name]
+                table.add_row(f"[yellow]{idx}. {name}[/yellow]")
+            panel = Panel(table, title=f"[magenta]{base_name}[/magenta]", border_style="blue", width=36)
+            panels.append(panel)
+
+        # Arrange panels into rows with three panels each
+        panels_per_row = 3
+        panel_rows = [panels[i:i + panels_per_row] for i in range(0, len(panels), panels_per_row)]
+        if panels and len(panel_rows[-1]) < panels_per_row:
+            for _ in range(panels_per_row - len(panel_rows[-1])):
+                panel_rows[-1].append(Panel("", border_style="blue", width=36))
+
+        rprint("\n[cyan]Available templates:[/cyan]")
+        for row in panel_rows:
+            self.console.print(Columns(row, equal=True, expand=True))
+        
+        return ordered_templates
 
     def list_datasets(self) -> list:
-        datasets_path = Path('../datasets')
+        datasets_path = self.root_path.parent / 'datasets'
         datasets = [folder.name for folder in datasets_path.iterdir() if folder.is_dir() and folder.name != '.ipynb_checkpoints']
         # Group datasets by base name
         grouped = {}
@@ -127,7 +181,6 @@ class ConfigManager:
         panels = []
         for base_name in sorted(grouped.keys()):
             table = Table(show_header=False, show_edge=False, box=None, padding=(0,1))
-            # Add column with max_width to control wrapping
             table.add_column(justify="left", no_wrap=False, overflow='fold', max_width=30)
             names_in_group = sorted(grouped[base_name], key=lambda x: x.lower(), reverse=True)
             for name in names_in_group:
@@ -135,10 +188,9 @@ class ConfigManager:
                 table.add_row(f"[yellow]{idx}. {name}[/yellow]")
             panel = Panel(table, title=f"[magenta]{base_name}[/magenta]", border_style="blue", width=36)
             panels.append(panel)
-        # Arrange panels into rows with three panels each, adding placeholder panels if needed
+        # Arrange panels into rows with three panels each
         panels_per_row = 3
         panel_rows = [panels[i:i + panels_per_row] for i in range(0, len(panels), panels_per_row)]
-        # Add placeholder panels to the last row if necessary
         if panels and len(panel_rows[-1]) < panels_per_row:
             for _ in range(panels_per_row - len(panel_rows[-1])):
                 panel_rows[-1].append(Panel("", border_style="blue", width=36))
@@ -163,7 +215,7 @@ class ConfigManager:
             content = content.replace(f"{token_name}-{old_version}", f"{token_name}-{new_version}")
             content = content.replace(f"{token_name}/{old_version}", f"{token_name}/{new_version}")
         else:
-            # For "lora" or "lokr" templates, replace placeholders with provided values
+            # For template configs, replace placeholders with provided values
             replacements = {
                 '__TOKEN_NAME__': token_name,
                 '__TOKEN_NAME_VERSION__': f"{token_name}-{new_version}",
@@ -218,9 +270,7 @@ class ConfigManager:
         with open(filepath, 'w') as f:
             json.dump(data, f, indent=2)
 
-    def update_config_files(
-        self, token_name: str, new_version: str, source_dir: str, dataset_dir: str, target_dir: str, old_version: Optional[str] = None
-    ) -> None:
+    def update_config_files(self, token_name: str, new_version: str, source_dir: str, dataset_dir: str, target_dir: str, old_version: Optional[str] = None) -> None:
         """Update configuration files in the target directory with new token and version info."""
         config_path = Path(target_dir) / "config.json"
         if config_path.exists():
@@ -239,10 +289,9 @@ class ConfigManager:
         self.clear_screen()
         rprint("[magenta]=== Configuration Folder Management Tool ===[/magenta]")
 
-        rprint("\n[cyan]Select source folder type:[/cyan]")
+        rprint("\n[cyan]Select source type:[/cyan]")
         rprint("[yellow]1. Use existing folder[/yellow]")
-        rprint("[yellow]2. Use 'lora' template[/yellow]")
-        rprint("[yellow]3. Use 'lokr' template[/yellow]")
+        rprint("[yellow]2. Use template[/yellow]")
 
         choice = Prompt.ask("Enter choice").strip()
         if not choice:
@@ -290,12 +339,24 @@ class ConfigManager:
                 except (IndexError, ValueError):
                     rprint("[red]Invalid selection. Please try again.[/red]")
                     return
-        else:
-            # For "lora" or "lokr" templates, no old_version is needed
-            source_dir = 'lora' if choice == '2' else 'lokr' if choice == '3' else None
-            if source_dir is None:
-                rprint("[red]Invalid choice. Exiting.[/red]")
+        elif choice == '2':
+            templates = self.list_templates()
+            if not templates:
+                rprint("[red]No templates found in config/templates directory. Exiting.[/red]")
                 return
+                
+            template_num_input = Prompt.ask("Enter template number").strip()
+            if not template_num_input:
+                rprint("[red]Exited--no input given[/red]")
+                return
+            try:
+                template_num = int(template_num_input)
+                template_name = templates[template_num - 1]
+                source_dir = str(self.templates_path / template_name)
+            except (IndexError, ValueError):
+                rprint("[red]Invalid selection. Please try again.[/red]")
+                return
+
             token_name = Prompt.ask("Enter new token name").strip()
             if not token_name:
                 rprint("[red]Exited--no input given[/red]")
@@ -318,6 +379,9 @@ class ConfigManager:
                 return
 
             old_version = None  # No old version when using templates
+        else:
+            rprint("[red]Invalid choice. Exiting.[/red]")
+            return
 
         target_dir = f"{token_name}-{new_version}"
 
