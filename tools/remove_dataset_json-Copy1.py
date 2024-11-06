@@ -12,45 +12,21 @@ from .base_tool import BaseTool
 class Tool(BaseTool):
     def __init__(self):
         super().__init__()
-        self.tool_name = "Dataset JSON Removal Tool"
+        self.tool_name = "Clear Dataset JSON"
         self.base_path = self.workspace_path / 'SimpleTuner'
-        # Define specific JSON patterns we're looking for
-        self.json_patterns = [
-            "aspect_ratio_bucket_indices_*.json",
-            "aspect_ratio_bucket_metadata_*.json"
-        ]
-
-    def verify_paths(self) -> bool:
-        """Verify that required paths exist."""
-        if not super().verify_paths():
-            return False
-            
-        if not self.base_path.exists():
-            rprint(f"[red]Error: SimpleTuner directory not found at {self.base_path}[/red]")
-            return False
-            
-        return True
-
-    def find_json_files(self, model_dir: Path) -> List[Path]:
-        """Find all matching JSON files in a model directory."""
-        json_files = []
-        for pattern in self.json_patterns:
-            json_files.extend(model_dir.glob(pattern))
-        return json_files
 
     def list_model_dirs(self) -> Tuple[List[str], Dict[str, List[str]]]:
-        """List all model directories containing target JSON files."""
+        """List all model directories containing JSON files."""
         try:
-            # Find all directories that contain our specific JSON files
+            # Find all directories that contain JSON files
             model_dirs = set()
+            all_jsons = list(self.base_path.glob("*/*.json"))  # Get all JSON files
             
-            # Look for directories containing our specific JSON patterns
-            for pattern in self.json_patterns:
-                for json_file in self.base_path.glob(f"*/{pattern}"):
-                    model_dirs.add(json_file.parent.name)
+            for json_file in all_jsons:
+                model_dirs.add(json_file.parent.name)
             
             if not model_dirs:
-                rprint("[yellow]No model directories with aspect ratio bucket JSON files found.[/yellow]")
+                rprint("[yellow]No model directories with JSON files found[/yellow]")
                 return [], {}
             
             # Group models by base name
@@ -75,10 +51,9 @@ class Tool(BaseTool):
                 table.add_column(justify="left", no_wrap=False, overflow='fold', max_width=30)
                 
                 for model_dir in sorted(grouped[base_name], key=str.lower, reverse=True):
-                    dir_path = self.base_path / model_dir
-                    json_count = len(self.find_json_files(dir_path))
+                    json_count = len(list(self.base_path.glob(f"{model_dir}/*.json")))
                     table.add_row(f"[yellow]{index}. {model_dir}[/yellow]")
-                    table.add_row(f"   [blue]{json_count} aspect ratio JSON files[/blue]")
+                    table.add_row(f"   [blue]{json_count} JSON files[/blue]")
                     index += 1
                     
                 panels.append(Panel(table, title=f"[magenta]{base_name}[/magenta]", 
@@ -99,14 +74,14 @@ class Tool(BaseTool):
             return [], {}
 
     def remove_json_files(self, model_dir: str, skip_confirm: bool = False) -> bool:
-        """Remove aspect ratio bucket JSON files from the specified model directory."""
+        """Remove all JSON files from the specified model directory."""
         try:
             dir_path = self.base_path / model_dir
-            json_files = self.find_json_files(dir_path)
+            json_files = list(dir_path.glob("*.json"))  # Get all JSON files
             
             if not json_files:
                 if not skip_confirm:
-                    rprint(f"[yellow]No aspect ratio bucket JSON files found in {model_dir}[/yellow]")
+                    rprint(f"[yellow]No JSON files found in {model_dir}[/yellow]")
                 return False
             
             # Display files to be removed
@@ -117,7 +92,7 @@ class Tool(BaseTool):
             
                 # Confirm deletion
                 confirm = Prompt.ask(
-                    "\nAre you sure you want to delete these aspect ratio bucket files? This cannot be undone",
+                    "\nAre you sure you want to delete these files? This cannot be undone",
                     choices=["y", "n"],
                     default="n"
                 )
@@ -138,20 +113,17 @@ class Tool(BaseTool):
                 deleted_count = 0
                 for json_file in json_files:
                     if json_file.exists():
-                        try:
-                            self.safe_remove(json_file)
-                            deleted_count += 1
-                        except Exception as e:
-                            rprint(f"[red]Error removing {json_file.name}: {str(e)}[/red]")
+                        self.safe_remove(json_file)
+                        deleted_count += 1
                     progress.advance(task)
             
             if deleted_count > 0:
                 if not skip_confirm:  # Only show individual success if not batch operation
-                    rprint(f"[green]Successfully removed {deleted_count} aspect ratio bucket files![/green]")
+                    rprint(f"[green]Successfully removed {deleted_count} JSON files![/green]")
                 return True
             else:
                 if not skip_confirm:
-                    rprint("[yellow]No files were removed[/yellow]")
+                    rprint("[yellow]No JSON files were removed[/yellow]")
                 return False
                 
         except Exception as e:
@@ -159,31 +131,17 @@ class Tool(BaseTool):
             return False
 
     def remove_group(self, token: str, model_dirs: List[str]) -> bool:
-        """Remove all aspect ratio bucket JSON files for a specific token group."""
+        """Remove all JSON files for a specific token group."""
         try:
-            # Count total files first
-            total_files = 0
-            dir_file_counts = {}
-            for model_dir in model_dirs:
-                dir_path = self.base_path / model_dir
-                files = self.find_json_files(dir_path)
-                count = len(files)
-                if count > 0:
-                    dir_file_counts[model_dir] = count
-                    total_files += count
-
-            if not dir_file_counts:
-                rprint(f"[yellow]No aspect ratio bucket JSON files found for token '{token}'[/yellow]")
-                return False
-
             # Display all directories to be processed
-            rprint(f"\n[cyan]Will remove aspect ratio bucket JSON files for token '{token}' from:[/cyan]")
-            for model_dir, count in dir_file_counts.items():
-                rprint(f"[yellow]- {model_dir} ({count} files)[/yellow]")
+            rprint(f"\n[cyan]Will remove ALL JSON files for token '{token}' from:[/cyan]")
+            for model_dir in model_dirs:
+                json_count = len(list(self.base_path.glob(f"{model_dir}/*.json")))
+                rprint(f"[yellow]- {model_dir} ({json_count} JSON files)[/yellow]")
             
             # Confirm group deletion
             confirm = Prompt.ask(
-                f"\nAre you sure you want to delete ALL aspect ratio bucket files for '{token}'? This cannot be undone",
+                f"\nAre you sure you want to delete ALL JSON files for '{token}'? This cannot be undone",
                 choices=["y", "n"],
                 default="n"
             )
@@ -194,7 +152,7 @@ class Tool(BaseTool):
             
             # Process all directories in group
             success_count = 0
-            total = len(dir_file_counts)
+            total = len(model_dirs)
             
             with Progress(
                 TextColumn("[bold blue]{task.description}"),
@@ -203,12 +161,11 @@ class Tool(BaseTool):
                 console=self.console,
                 transient=True
             ) as progress:
-                task = progress.add_task(f"Removing aspect ratio bucket files for {token}...", total=total)
+                task = progress.add_task(f"Removing all JSON files for {token}...", total=total)
                 
                 for model_dir in model_dirs:
-                    if model_dir in dir_file_counts:
-                        if self.remove_json_files(model_dir, skip_confirm=True):
-                            success_count += 1
+                    if self.remove_json_files(model_dir, skip_confirm=True):
+                        success_count += 1
                     progress.advance(task)
             
             rprint(f"[green]Successfully processed {success_count}/{total} directories for '{token}'![/green]")
@@ -226,13 +183,12 @@ class Tool(BaseTool):
             self.exit_tool()
             return
             
-        rprint("[magenta]=== Dataset JSON Removal Tool ===[/magenta]")
-        rprint("[cyan]Purpose: Remove aspect ratio bucket JSON files from model directories[/cyan]")
+        rprint("[magenta]=== Clear Dataset JSON ===[/magenta]")
         rprint("[cyan]Press Enter to return to main menu[/cyan]")
         rprint("[cyan]Use group name + all to delete whole group (e.g. 'lulu15 all')[/cyan]")
         
         # List and select model directory
-        rprint("\n[cyan]Model Directories with Aspect Ratio Bucket Files:[/cyan]")
+        rprint("\n[cyan]Model Directories with JSON Files:[/cyan]")
         model_dirs, token_groups = self.list_model_dirs()
         if not model_dirs:
             self.exit_tool()
@@ -258,3 +214,7 @@ class Tool(BaseTool):
             self.remove_json_files(selected_dir)
         except (ValueError, IndexError):
             rprint("[red]Invalid selection[/red]")
+
+if __name__ == "__main__":
+    tool = Tool()
+    tool.run()

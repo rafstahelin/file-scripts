@@ -380,33 +380,9 @@ class Tool(BaseTool):
         self.mover.base_path = self.workspace_path / 'SimpleTuner/output'
         self.mover.destination_base = self.workspace_path / 'StableSwarmUI/Models/Lora/flux'
         
-    def process(self):
-        """Main process implementation."""
-        self.clear_screen()
-        
-        if not self.verify_paths():
-            self.exit_tool()
-            return
-            
-        rprint("[magenta]=== LoRA Model Management Tool ===[/magenta]")
-        
-        rprint("\n[cyan]Select processing mode:[/cyan]")
-        rprint("[yellow]1. Process single version[/yellow]")
-        rprint("[yellow]2. Process all versions of a model[/yellow]")
-        rprint("[cyan]Press Enter to return to main menu[/cyan]")
-        
-        choice = Prompt.ask("\nEnter choice").strip()
-        if not choice:
-            self.exit_tool()
-            return
-        
-        if choice == "1":
-            self.mover.process_single_version()
-        elif choice == "2":
-            self.mover.process_all_versions()
-        else:
-            rprint("[red]Invalid choice[/red]")
-            time.sleep(1)
+    def run(self):
+        """Main execution method that delegates to LoRaMover."""
+        self.mover.run()
 
 if __name__ == "__main__":
     tool = Tool()

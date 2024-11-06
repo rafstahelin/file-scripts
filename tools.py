@@ -17,24 +17,24 @@ class ToolsManager:
         self.archive_path = self.workspace_path / 'file-scripts' / 'archive'
         self.docs_path = self.workspace_path / 'file-scripts' / 'docs'
         
-        # Tool categories and their tools
+        # Tool categories and their toolsUself.tool_categories = {
         self.tool_categories = {
-            "Model Management": [
-                ('config_manager', 'Configure training configurations', 'cm'),
-                ('lora_mover', 'Process and organize LoRA models', 'lm')
-            ],
-            "Cleanup Tools": [
-                ('remove_configs', 'Remove configuration files', 'rc'),
-                ('remove_dataset_cache', 'Clear dataset cache directories', 'rd'),
-                ('remove_dataset_json', 'Clean up dataset JSON files', 'rj'),
-                ('remove_checkpoints', 'Delete .ipynb_checkpoints directories', 'cp'),
-                ('delete_models', 'Remove model files and associated data', 'dm')
-            ],
-            "Utilities": [
-                ('download_configs', 'Sync configurations with Dropbox', 'dc'),
-                ('debug_crops', 'Debug image preparation issues', 'db')
-            ]
-        }
+    "Model Management": [
+        ('config_manager', 'Configure training configurations', 'cm'),
+        ('lora_mover', 'Process and organize LoRA models', 'lm')
+    ],
+    "Cleanup Tools": [
+        ('remove_configs', 'Remove configuration files', 'rc'),
+        ('remove_dataset_cache', 'Clear Dataset Cache', 'rd'),
+        ('remove_dataset_json', 'Clear Dataset JSON', 'rj'),
+        ('remove_checkpoints', 'Delete .ipynb_checkpoints directories', 'cp'),
+        ('delete_models', 'Remove model files and associated data', 'dm')
+    ],
+    "Utilities": [
+        ('download_configs', 'Sync configurations with Dropbox', 'dc'),
+        ('debug_crops', 'Debug image preparation issues', 'db')
+    ]
+}
 
     def clear_screen(self):
         """Clear terminal screen."""
@@ -117,7 +117,7 @@ class ToolsManager:
         
         return None
 
-    def run_tool(self, tool_name: str) -> None:
+    def run_tool(self, tool_name: str) -> None:  # Fixed indentation - part of class
         """Run a specific tool."""
         try:
             tool_path = self.tools_path / f"{tool_name}.py"
@@ -128,7 +128,7 @@ class ToolsManager:
             sys.path.append(str(self.tools_path.parent))
             module = __import__(f"tools.{tool_name}", fromlist=['Tool'])
             tool = module.Tool()
-            tool.run()
+            tool.run()  # BaseTool now handles its own loop and exit
         except ImportError as e:
             rprint(f"[red]Error importing tool '{tool_name}': {str(e)}[/red]")
         except Exception as e:
@@ -136,15 +136,16 @@ class ToolsManager:
         finally:
             if str(self.tools_path.parent) in sys.path:
                 sys.path.remove(str(self.tools_path.parent))
+            self.clear_screen()
 
-    def run(self):
+    def run(self):  # Fixed indentation - part of class
         """Main execution method."""
         self.clear_screen()
         
         # Verify paths
         if not self.verify_paths():
             return
-            
+        
         while True:
             self.clear_screen()
             self.display_menu()
@@ -157,15 +158,15 @@ class ToolsManager:
             if not choice:
                 rprint("\n[yellow]Exiting File Management Tools...[/yellow]")
                 break
-                
+            
             tool_name = self.get_tool_by_input(choice)
             if tool_name:
                 self.clear_screen()
                 self.run_tool(tool_name)
-                # Wait for user input before returning to menu
-                input("\nPress Enter to return to menu...")
+                # Removed the input prompt here since BaseTool handles it
             else:
                 rprint("[red]Invalid selection. Please try again.[/red]")
+
 
 if __name__ == "__main__":
     manager = ToolsManager()

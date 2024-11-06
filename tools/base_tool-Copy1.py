@@ -8,7 +8,6 @@ from rich import print as rprint
 from rich.prompt import Prompt
 import shutil
 import os
-import time
 
 class BaseTool:
     def __init__(self):
@@ -18,7 +17,6 @@ class BaseTool:
         self.models_path = self.workspace_path / 'models'
         self.datasets_path = self.workspace_path / 'datasets'
         self.cache_path = self.workspace_path / 'cache'
-        self._should_exit = False
         
     def clear_screen(self):
         """Clear terminal screen."""
@@ -76,24 +74,7 @@ class BaseTool:
         except Exception as e:
             rprint(f"[red]Error removing {path}: {str(e)}[/red]")
             return False
-            
-    def run(self):
-        """Main execution method."""
-        while not self._should_exit:
-            try:
-                self.process()
-                if not self._should_exit:
-                    time.sleep(0.5)
-                    self.clear_screen()
-            except Exception as e:
-                rprint(f"[red]Error: {str(e)}[/red]")
-                self._should_exit = True
-                return
 
-    def process(self):
-        """Main process to be implemented by child classes."""
-        raise NotImplementedError("Each tool must implement its own process() method.")
-        
-    def exit_tool(self):
-        """Call this to exit the tool loop."""
-        self._should_exit = True
+    def run(self):
+        """Main execution method to be implemented by child classes."""
+        raise NotImplementedError("Each tool must implement its own run() method.")
