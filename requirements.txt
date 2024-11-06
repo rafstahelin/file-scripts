@@ -1,0 +1,7 @@
+rich==13.7.*
+python-dotenv==1.0.*
+ipywidgets==8.1.*
+ipython==8.12.*
+numpy==1.26.*
+pandas==2.2.*
+matplotlib==3.8.*
