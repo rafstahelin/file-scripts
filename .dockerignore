@@ -1,0 +1,25 @@
+# Development environment
+.venv/
+venv/
+ENV/
+__pycache__/
+*.py[cod]
+*.class
+
+# Git
+.git/
+.gitignore
+
+# Environment and IDE
+.env
+.env.*
+.vscode/
+.idea/
+
+# Logs and databases
+*.log
+*.sqlite
+
+# Documentation and tests
+docs/
+tests/

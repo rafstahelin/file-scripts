@@ -25,3 +25,27 @@ ENV/
 # OS specific
 .DS_Store
 Thumbs.db
+# Virtual Environment
+.venv/
+venv/
+ENV/
+
+# Python cache
+__pycache__/
+*.py[cod]
+*.class
+
+# Environment variables
+.env
+.env.*
+
+# IDE settings
+.vscode/
+.idea/
+
+# Jupyter Notebook
+.ipynb_checkpoints
+
+# Local development files
+*.log
+*.sqlite
