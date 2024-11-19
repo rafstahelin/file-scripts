@@ -1,51 +1,6 @@
-# Python
 __pycache__/
 *.py[cod]
-*.class
-
-# Jupyter Notebook
-.ipynb_checkpoints
-*/.ipynb_checkpoints/*
-**/.ipynb_checkpoints
-**/*.ipynb_checkpoints/
-
-# VS Code
-.vscode/
-*.code-workspace
-*.swp
-*.swo
-
-# Environment
-.env
-.venv
-env/
-venv/
-ENV/
-
-# OS specific
+*$py.class
 .DS_Store
-Thumbs.db
-# Virtual Environment
-.venv/
-venv/
-ENV/
-
-# Python cache
-__pycache__/
-*.py[cod]
-*.class
-
-# Environment variables
 .env
-.env.*
-
-# IDE settings
-.vscode/
-.idea/
-
-# Jupyter Notebook
 .ipynb_checkpoints
-
-# Local development files
-*.log
-*.sqlite
