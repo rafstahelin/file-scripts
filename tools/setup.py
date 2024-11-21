@@ -1,6 +1,9 @@
 """
 Environment Setup Tool
 ---------------------
+Version: 0.7.0
+Status: Stable
+
 • Git Repository Management:
   - Syncs file-scripts to latest dev branch
   - Handles merge conflicts and issues
@@ -19,6 +22,10 @@ Environment Setup Tool
 Usage:
     Menu option: 'setup' or shortcut: 'st'
 """
+
+# Version information
+__version__ = "0.7.0"
+__status__ = "stable"
 
 from pathlib import Path
 import subprocess
