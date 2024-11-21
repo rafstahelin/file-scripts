@@ -1,0 +1,13 @@
+# Auto detect text files and perform LF normalization
+* text=auto
+
+# Explicitly declare text files that should keep their file mode
+*.py text
+*.md text
+*.json text
+*.txt text
+*.rules text
+*.sh text
+
+# Keep executable bit on shell scripts
+*.sh text eol=lf
