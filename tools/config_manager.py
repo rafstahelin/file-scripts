@@ -182,14 +182,15 @@ class ConfigManager:
         
         # Group datasets by base name
         grouped = {}
-        ordered_datasets = []
+        ordered_datasets = []  # This will store datasets in display order
         index = 1
         
-        for dataset in datasets:
+        # Sort datasets first to maintain consistent order
+        for dataset in sorted(datasets):
             base_name = dataset.split('-', 1)[0]
             grouped.setdefault(base_name, []).append(dataset)
-            ordered_datasets.append(dataset)
-
+            ordered_datasets.append(dataset)  # Add to ordered list as we process
+    
         # Create panels for each group
         panels = []
         for base_name in sorted(grouped.keys()):
@@ -200,11 +201,11 @@ class ConfigManager:
             for name in names_in_group:
                 table.add_row(f"[yellow]{index}. {name}[/yellow]")
                 index += 1
-                
+                    
             panel = Panel(table, title=f"[magenta]{base_name}[/magenta]", 
                          border_style="blue", width=36)
             panels.append(panel)
-
+    
         # Display panels
         panels_per_row = 3
         for i in range(0, len(panels), panels_per_row):
@@ -212,7 +213,7 @@ class ConfigManager:
             while len(row_panels) < panels_per_row:
                 row_panels.append(Panel("", border_style="blue", width=36))
             self.console.print(Columns(row_panels, equal=True, expand=True))
-            
+        
         return ordered_datasets
 
     def parse_folder_name(self, folder: str) -> Tuple[str, str]:
