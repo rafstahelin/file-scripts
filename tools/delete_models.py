@@ -1,5 +1,6 @@
 import os
-import glob
+import sys
+import shutil
 from pathlib import Path
 from typing import List, Dict, Optional
 from rich.console import Console
@@ -8,149 +9,161 @@ from rich.table import Table
 from rich.panel import Panel
 from rich.columns import Columns
 from rich import print as rprint
-from rich.prompt import Prompt
+
+# Platform-specific imports
+if os.name == 'nt':
+    import msvcrt
+else:
+    import tty
+    import termios
 
 class Tool:
+    """
+    Delete Models Tool
+    -----------------
+    Manages deletion of model directories in SimpleTuner output path.
+    Version: 0.7.0
+    """
+    
     def __init__(self):
+        self.version = "0.7.0"
         self.console = Console()
-        self.base_path = Path('/workspace/SimpleTuner')
+        self.base_path = Path('/workspace/SimpleTuner/output')
         
     def clear_screen(self):
         """Clear terminal screen."""
         os.system('clear' if os.name == 'posix' else 'cls')
         
+    def getch(self) -> str:
+        """Get a single character from the user."""
+        if os.name == 'nt':
+            return msvcrt.getch().decode()
+        else:
+            fd = sys.stdin.fileno()
+            old_settings = termios.tcgetattr(fd)
+            try:
+                tty.setraw(fd)
+                ch = sys.stdin.read(1)
+            finally:
+                termios.tcsetattr(fd, termios.TCSADRAIN, old_settings)
+            return ch
+
+    def wait_key(self) -> bool:
+        """Wait for Enter or Escape key."""
+        while True:
+            key = self.getch()
+            if key in ['\r', '\n']:  # Enter key
+                return True
+            elif key == '\x1b':  # Escape key
+                return False
+
     def verify_paths(self) -> bool:
         """Verify that required paths exist."""
         if not self.base_path.exists():
-            rprint(f"[red]Error: Base directory {self.base_path} does not exist[/red]")
+            self.console.print(f"[red]Error: Output directory {self.base_path} does not exist[/red]")
             return False
         return True
 
-    def show_progress(self, description: str) -> None:
-        """Show a progress bar with the given description."""
-        with Progress(
-            TextColumn("[bold blue]{task.description}"),
-            BarColumn(complete_style="green"),
-            TaskProgressColumn(),
-            console=self.console,
-            transient=True
-        ) as progress:
-            task = progress.add_task(description, total=100)
-            while not progress.finished:
-                progress.update(task, advance=1)
-                import time
-                time.sleep(0.02)
-
-    def list_model_dirs(self) -> List[str]:
-        """List all model directories containing JSON files."""
+    def list_model_dirs(self) -> Dict[str, List[str]]:
+        """List all model families and their version directories."""
         try:
-            # Find all directories that contain relevant JSON files
-            model_dirs = set()
-            json_patterns = [
-                'aspect_ratio_bucket_indices_*.json',
-                'aspect_ratio_bucket_metadata_*.json'
-            ]
+            model_families = {}
             
-            for pattern in json_patterns:
-                for json_file in self.base_path.glob(f"*/{pattern}"):
-                    model_dirs.add(json_file.parent.name)
-            
-            if not model_dirs:
-                rprint("[yellow]No model directories with JSON files found[/yellow]")
-                return []
-            
-            # Group models by base name
-            grouped = {}
-            for model_dir in sorted(model_dirs):
-                base_name = model_dir.split('-')[0]
-                grouped.setdefault(base_name, []).append(model_dir)
-            
-            panels = []
-            ordered_dirs = []
-            index = 1
-            
-            for base_name in sorted(grouped.keys()):
-                table = Table(show_header=False, show_edge=False, box=None, padding=(0,1))
-                table.add_column(justify="left", no_wrap=False, overflow='fold', max_width=30)
+            if not self.base_path.exists():
+                self.console.print("[red]Output directory does not exist![/red]")
+                return {}
                 
-                for model_dir in sorted(grouped[base_name], key=str.lower, reverse=True):
-                    table.add_row(f"[yellow]{index}. {model_dir}[/yellow]")
-                    ordered_dirs.append(model_dir)
-                    index += 1
-                    
-                panels.append(Panel(table, title=f"[magenta]{base_name}[/magenta]", 
-                                  border_style="blue", width=36))
+            for family_dir in self.base_path.iterdir():
+                if family_dir.is_dir():
+                    versions = []
+                    for version_dir in family_dir.iterdir():
+                        if version_dir.is_dir():
+                            versions.append(version_dir.name)
+                    if versions:
+                        model_families[family_dir.name] = sorted(versions, reverse=True)
             
-            # Display panels in rows of three
-            panels_per_row = 3
-            for i in range(0, len(panels), panels_per_row):
-                row_panels = panels[i:i + panels_per_row]
-                while len(row_panels) < panels_per_row:
-                    row_panels.append(Panel("", border_style="blue", width=36))
-                self.console.print(Columns(row_panels, equal=True, expand=True))
-                
-            return ordered_dirs
+            return model_families
             
         except Exception as e:
-            rprint(f"[red]Error scanning directories: {str(e)}[/red]")
-            return []
+            self.console.print(f"[red]Error scanning directories: {str(e)}[/red]")
+            return {}
 
-    def remove_json_files(self, model_dir: str) -> bool:
-        """Remove all dataset JSON files from the specified model directory."""
+    def display_models(self, model_families: Dict[str, List[str]]) -> List[tuple]:
+        """Display model families and versions in organized panels."""
+        if not model_families:
+            self.console.print("[yellow]No model directories found[/yellow]")
+            return []
+            
+        panels = []
+        model_map = []  # Store (family, version) tuples for selection
+        index = 1
+        
+        for family_name, versions in sorted(model_families.items()):
+            table = Table(show_header=False, show_edge=False, box=None, padding=(0,1))
+            table.add_column(justify="left", no_wrap=False, overflow='fold', max_width=40)
+            
+            # Add all versions option
+            table.add_row(f"[yellow]{index}. {family_name} (ALL VERSIONS)[/yellow]")
+            model_map.append((family_name, None))
+            index += 1
+            
+            # Add individual versions
+            for version in versions:
+                table.add_row(f"[yellow]{index}. {family_name}/{version}[/yellow]")
+                model_map.append((family_name, version))
+                index += 1
+                
+            panels.append(Panel(table, title=f"[magenta]{family_name}[/magenta]", 
+                              border_style="blue", width=46))
+        
+        # Display panels in rows of two
+        panels_per_row = 2
+        for i in range(0, len(panels), panels_per_row):
+            row_panels = panels[i:i + panels_per_row]
+            self.console.print(Columns(row_panels, equal=True, expand=True))
+                
+        return model_map
+
+    def delete_model(self, family: str, version: Optional[str] = None) -> bool:
+        """Delete model directory or specific version."""
         try:
-            dir_path = self.base_path / model_dir
-            json_files = []
+            target_path = self.base_path / family
+            if version:
+                target_path = target_path / version
             
-            # Find all relevant JSON files
-            json_patterns = [
-                'aspect_ratio_bucket_indices_*.json',
-                'aspect_ratio_bucket_metadata_*.json'
-            ]
-            
-            for pattern in json_patterns:
-                json_files.extend(dir_path.glob(pattern))
-            
-            if not json_files:
-                rprint(f"[yellow]No JSON files found in {model_dir}[/yellow]")
+            if not target_path.exists():
+                self.console.print(f"[red]Path does not exist: {target_path}[/red]")
                 return False
             
-            # Display files to be removed
-            rprint("\n[cyan]Found the following JSON files to remove:[/cyan]")
-            for json_file in json_files:
-                rprint(f"[yellow]- {json_file.name}[/yellow]")
+            # Count items to delete for progress bar
+            total_items = sum(1 for _ in target_path.rglob('*')) + 1
             
             # Confirm deletion
-            confirm = Prompt.ask(
-                "\nAre you sure you want to delete these files? This cannot be undone",
-                choices=["y", "n"],
-                default="n"
-            )
+            self.console.print(f"\n[cyan]Preparing to delete:[/cyan] [yellow]{target_path.relative_to(self.base_path)}[/yellow]")
+            self.console.print("\nPress [white]ENTER[/white] to delete, ESCAPE for cancel")
             
-            if confirm.lower() == 'y':
-                with Progress(
-                    TextColumn("[bold blue]{task.description}"),
-                    BarColumn(complete_style="green"),
-                    TaskProgressColumn(),
-                    console=self.console,
-                    transient=True
-                ) as progress:
-                    task = progress.add_task("Removing JSON files...", total=len(json_files))
-                    
-                    deleted_count = 0
-                    for json_file in json_files:
-                        if json_file.exists():
-                            json_file.unlink()
-                            deleted_count += 1
-                        progress.advance(task)
-                
-                rprint(f"[green]Successfully removed {deleted_count} JSON files![/green]")
-                return True
-            else:
-                rprint("[yellow]Operation cancelled[/yellow]")
+            if not self.wait_key():
+                self.console.print("[yellow]Operation cancelled[/yellow]")
                 return False
+            
+            # Delete with progress bar
+            with Progress(
+                TextColumn("[bold blue]{task.description}"),
+                BarColumn(complete_style="green"),
+                TaskProgressColumn(),
+                console=self.console,
+                transient=True
+            ) as progress:
+                task = progress.add_task(f"Deleting {target_path.name}...", total=total_items)
+                
+                # Delete directory contents
+                shutil.rmtree(target_path, onerror=lambda f, p, e: progress.advance(task))
+                
+            self.console.print(f"[green]Successfully deleted {target_path.relative_to(self.base_path)}![/green]")
+            return True
                 
         except Exception as e:
-            rprint(f"[red]Error removing JSON files: {str(e)}[/red]")
+            self.console.print(f"[red]Error during deletion: {str(e)}[/red]")
             return False
 
     def run(self):
@@ -160,24 +173,40 @@ class Tool:
         if not self.verify_paths():
             return
             
-        rprint("[magenta]=== Dataset JSON Removal Tool ===[/magenta]\n")
+        self.console.print(f"[magenta]=== Model Deletion Tool v{self.version} ===[/magenta]\n")
         
-        # List and select model directory
-        rprint("[cyan]Model Directories with JSON Files:[/cyan]")
-        model_dirs = self.list_model_dirs()
-        if not model_dirs:
-            return
+        while True:
+            # List and display models
+            model_families = self.list_model_dirs()
+            model_map = self.display_models(model_families)
             
-        dir_num = Prompt.ask("\nEnter number to select directory").strip()
-        if not dir_num:
-            rprint("[red]Exited--no input given[/red]")
-            return
+            if not model_map:
+                return
+                
+            # Get user selection
+            self.console.print("\n[yellow]Press MODEL/VERSION # to Select Deletion:[/yellow]")
+            selection = input().strip()
             
-        try:
-            selected_dir = model_dirs[int(dir_num) - 1]
-        except (ValueError, IndexError):
-            rprint("[red]Invalid selection[/red]")
-            return
-            
-        # Remove JSON files from selected directory
-        self.remove_json_files(selected_dir)
+            try:
+                index = int(selection) - 1
+                if 0 <= index < len(model_map):
+                    family, version = model_map[index]
+                    self.delete_model(family, version)
+                    
+                    # Check if there are more models to delete
+                    self.console.print("\n[yellow]Delete more Models?[/yellow] [white][enter/escape][/white]")
+                    
+                    if not self.wait_key():
+                        break
+                    
+                    # Refresh display
+                    self.clear_screen()
+                    self.console.print(f"[magenta]=== Model Deletion Tool v{self.version} ===[/magenta]\n")
+                else:
+                    self.console.print("[red]Invalid selection[/red]")
+            except ValueError:
+                self.console.print("[red]Please enter a valid number[/red]")
+
+if __name__ == "__main__":
+    tool = Tool()
+    tool.run()
