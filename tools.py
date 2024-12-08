@@ -34,8 +34,8 @@ class ToolsManager:
                 ('validation_grid', 'Validation Grid', 'OK')
             ],
             "Cleanup Tools": [
-                ('delete_models', 'Delete Models', '-'),
-                ('remove_configs', 'Remove Configs', '-'),
+                ('delete_models', 'Delete Models', 'OK'),
+                ('remove_configs', 'Remove Configs', 'OK'),
                 ('remove_dataset_cache', 'Remove Dataset Cache', '-'),
                 ('remove_dataset_json', 'Remove Dataset JSON', '-'),
                 ('remove_checkpoints', 'Remove Checkpoints', '-')
