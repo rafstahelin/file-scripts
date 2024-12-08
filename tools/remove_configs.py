@@ -151,7 +151,7 @@ class Tool:
             if not tokens:
                 return True
                 
-            choice = Prompt.ask("\nEnter config number to remove")
+            choice = Prompt.ask("\nEnter config number to remove, or config-base + all to remove all related configs")
             if not choice:
                 return True  # Clean exit
                 
