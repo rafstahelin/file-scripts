@@ -2,7 +2,6 @@
 File Scripts Tools Manager
 -------------------------
 Central menu system for managing and running file-scripts tools.
-Run directly or use 'tools' command after setup.
 """
 
 import os
@@ -26,25 +25,24 @@ class ToolsManager:
 
         # Tool categories and their tools
         self.tool_categories = {
-            "Environment": [
-                ('setup', 'Initial environment setup and configuration', 'st')
-            ],
             "Model Management": [
-                ('config_manager', 'Configure training configurations', 'cm'),
-                ('lora_mover', 'Process and organize LoRA models', 'lm')
+                ('config_manager', 'Config Manager', 'OK'),
+                ('lora_mover', 'LoRA Mover', 'OK'),
+                ('metadata_reader', 'Metadata Reader', 'OK')
+            ],
+            "Development Tools": [
+                ('validation_grid', 'Validation Grid', 'OK')
             ],
             "Cleanup Tools": [
-                ('remove_configs', 'Remove configuration files', 'rc'),
-                ('remove_dataset_cache', 'Clear Dataset Cache', 'rd'),
-                ('remove_dataset_json', 'Clear Dataset JSON', 'rj'),
-                ('remove_checkpoints', 'Delete .ipynb_checkpoints directories', 'cp'),
-                ('delete_models', 'Remove model files and associated data', 'dm')
+                ('delete_models', 'Delete Models', '-'),
+                ('remove_configs', 'Remove Configs', '-'),
+                ('remove_dataset_cache', 'Remove Dataset Cache', '-'),
+                ('remove_dataset_json', 'Remove Dataset JSON', '-'),
+                ('remove_checkpoints', 'Remove Checkpoints', '-')
             ],
             "Utilities": [
-                ('download_configs', 'Sync configurations with Dropbox', 'dc'),
-                ('debug_crops', 'Debug image preparation issues', 'db'),
-                ('validation_grid', 'Create horizontal validation image grids', 'vg'),
-                ('metadata_reader', 'Read LoRA safetensors metadata', 'mr')
+                ('download_configs', 'Download Configs', '-'),
+                ('debug_crops', 'Debug Crops', '-')
             ]
         }
 
@@ -70,12 +68,14 @@ class ToolsManager:
             )
 
             table.add_column("Tool", style="white", width=45)
-            table.add_column("Shortcut", style="yellow", width=10)
+            table.add_column("Status", style="yellow", width=10)
 
-            for tool_name, description, shortcut in tools:
+            for tool_name, description, status in tools:
+                # Add status color based on value
+                status_color = "green" if status == "OK" else "red" if status == "-" else "yellow"
                 table.add_row(
                     f"[yellow]{total_idx}.[/yellow] {description}",
-                    f"[yellow]{shortcut}[/yellow]"
+                    f"[{status_color}]{status}[/{status_color}]"
                 )
                 total_idx += 1
 
@@ -90,15 +90,10 @@ class ToolsManager:
             print()
 
     def get_tool_by_input(self, user_input: str) -> Optional[str]:
-        """Get tool name from user input (number or shortcut)."""
+        """Get tool name from user input number."""
         all_tools = self.get_all_tools()
         
-        # Check shortcuts first
-        for tool_name, _, shortcut in all_tools:
-            if user_input.lower() == shortcut.lower():
-                return tool_name
-
-        # Check numerical input
+        # Check numerical input only
         try:
             choice_num = int(user_input)
             if 1 <= choice_num <= len(all_tools):
@@ -107,6 +102,8 @@ class ToolsManager:
             pass
 
         return None
+
+    # [Rest of the class methods remain unchanged...]
 
     def run_tool(self, tool_name: str) -> None:
         """Run a specific tool."""

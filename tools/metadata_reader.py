@@ -1,5 +1,5 @@
 from pathlib import Path
-from typing import Dict, Optional, List
+from typing import Dict, Optional, List, Any
 from rich.console import Console
 from rich.panel import Panel
 from rich.columns import Columns
@@ -7,6 +7,7 @@ from rich.table import Table
 from rich.prompt import Prompt
 from rich import print as rprint
 import json
+import traceback
 from safetensors.torch import safe_open
 from .base_tool import BaseTool
 
@@ -131,38 +132,91 @@ class MetadataReader:
             rprint(f"[red]Error reading metadata: {str(e)}[/red]")
             return None
 
+    def _format_value(self, value: Any) -> str:
+        """Format a value with appropriate color."""
+        if value is None:
+            return "[yellow]null[/yellow]"
+        elif isinstance(value, (int, float)):
+            return f"[yellow]{value}[/yellow]"
+        elif isinstance(value, bool):
+            return f"[yellow]{str(value).lower()}[/yellow]"
+        elif isinstance(value, str):
+            return f"[yellow]\"{value}\"[/yellow]"
+        elif isinstance(value, (list, dict)):
+            return self._format_json_with_colors(value)
+        return f"[yellow]{value}[/yellow]"
+
+    def _format_json_with_colors(self, obj: Any, indent_level: int = 0) -> str:
+        """Recursively format JSON with colors."""
+        indent = "  " * indent_level
+        lines = []
+
+        if isinstance(obj, dict):
+            lines.append("{")
+            items = list(obj.items())
+            for i, (key, value) in enumerate(items):
+                if key.startswith('--'):
+                    key_str = f"{indent}  [cyan]{key}[/cyan]:"
+                else:
+                    key_str = f"{indent}  [cyan]\"{key}\"[/cyan]:"
+                
+                if isinstance(value, (dict, list)):
+                    value_str = self._format_json_with_colors(value, indent_level + 1)
+                    lines.append(f"{key_str} {value_str}")
+                else:
+                    value_str = self._format_value(value)
+                    lines.append(f"{key_str} {value_str}")
+                
+                if i < len(items) - 1:
+                    lines[-1] += ","
+                    
+            lines.append(f"{indent}}}")
+            
+        elif isinstance(obj, list):
+            lines.append("[")
+            for i, item in enumerate(obj):
+                if isinstance(item, (dict, list)):
+                    item_str = self._format_json_with_colors(item, indent_level + 1)
+                    lines.append(f"{indent}  {item_str}")
+                else:
+                    item_str = self._format_value(item)
+                    lines.append(f"{indent}  {item_str}")
+                
+                if i < len(obj) - 1:
+                    lines[-1] += ","
+                    
+            lines.append(f"{indent}]")
+            
+        return "\n".join(lines)
+
     def display_metadata(self, metadata: Dict) -> None:
-        """Display formatted metadata."""
+        """Display complete formatted metadata with colors."""
         try:
-            # Try to parse and format specific sections
-            try:
-                training_params = json.loads(metadata.get("training_params", "{}"))
-                dataset_info = json.loads(metadata.get("dataset_info", "{}"))
-                
-                training_str = "\n".join(f"{k}: {v}" for k, v in sorted(training_params.items()))
-                dataset_str = "\n".join(f"{k}: {v}" for k, v in sorted(dataset_info.items()))
-                
-                other_metadata = {k: v for k, v in metadata.items() 
-                                if k not in ["training_params", "dataset_info"]}
-                other_str = "\n".join(f"{k}: {v}" for k, v in sorted(other_metadata.items()))
-                
-                content = (
-                    f"[cyan]Training Parameters:[/cyan]\n{training_str}\n\n"
-                    f"[cyan]Dataset Information:[/cyan]\n{dataset_str}\n\n"
-                    f"[cyan]Other Metadata:[/cyan]\n{other_str}"
-                )
-            except:
-                # Fallback to raw display if parsing fails
-                content = json.dumps(metadata, indent=2)
+            # Parse the complete configurations
+            config_data = json.loads(metadata.get('complete_config', '{}'))
+            backend_data = json.loads(metadata.get('complete_backend', '{}'))
+            
+            # Format both configurations with colors
+            config_section = self._format_json_with_colors(config_data)
+            backend_section = self._format_json_with_colors(backend_data)
+            
+            content = (
+                f"[bold cyan]Complete Configuration:[/bold cyan]\n{config_section}\n\n"
+                f"[bold cyan]Complete Backend Configuration:[/bold cyan]\n{backend_section}"
+            )
             
             panel = Panel.fit(
                 content,
                 title="[bold magenta]Safetensors Metadata[/bold magenta]",
-                border_style="blue"
+                border_style="blue",
+                padding=(1, 2)
             )
             self.console.print(panel)
+            
         except Exception as e:
             rprint(f"[red]Error displaying metadata: {str(e)}[/red]")
+            self.console.print(traceback.format_exc())
+
 
 class Tool(BaseTool):
     def __init__(self):
@@ -219,6 +273,7 @@ class Tool(BaseTool):
             except Exception as e:
                 rprint(f"[red]Error: {str(e)}[/red]")
                 Prompt.ask("\nPress Enter to continue")
+
 
 if __name__ == "__main__":
     tool = Tool()
