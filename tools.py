@@ -41,7 +41,7 @@ class ToolsManager:
                 ('remove_checkpoints', 'Remove Checkpoints', 'OK')
             ],
             "Utilities": [
-                ('download_configs', 'Download Configs', '-'),
+                ('download_configs', 'Download Configs', 'OK'),
                 ('debug_crops', 'Debug Crops', '-')
             ]
         }
