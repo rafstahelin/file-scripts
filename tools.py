@@ -36,9 +36,9 @@ class ToolsManager:
             "Cleanup Tools": [
                 ('delete_models', 'Delete Models', 'OK'),
                 ('remove_configs', 'Remove Configs', 'OK'),
-                ('remove_dataset_cache', 'Remove Dataset Cache', '-'),
-                ('remove_dataset_json', 'Remove Dataset JSON', '-'),
-                ('remove_checkpoints', 'Remove Checkpoints', '-')
+                ('remove_dataset_cache', 'Remove Dataset Cache', 'OK'),
+                ('remove_dataset_json', 'Remove Dataset JSON', 'OK'),
+                ('remove_checkpoints', 'Remove Checkpoints', 'OK')
             ],
             "Utilities": [
                 ('download_configs', 'Download Configs', '-'),
