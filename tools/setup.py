@@ -190,9 +190,52 @@ class Tool:
             self.console.print(f"[red]Error configuring rclone:[/]\n{str(e)}")
             return False
 
+    def check_git_credentials(self):
+        """Check and setup git credentials if needed."""
+        try:
+            netrc_path = Path(os.path.expanduser("~/.netrc"))
+            
+            # Check if .netrc exists and has correct permissions
+            if not netrc_path.exists():
+                self.console.print("[yellow]Warning: .netrc file not found, creating...[/]")
+                with open(netrc_path, 'w') as f:
+                    f.write("""machine github.com
+login rafstahelin
+password your_pat_token""")
+                os.chmod(netrc_path, 0o600)
+                self.console.print("[green]✓[/] .netrc file created with secure permissions")
+            
+            # Check permissions
+            current_perms = os.stat(netrc_path).st_mode & 0o777
+            if current_perms != 0o600:
+                self.console.print("[yellow]Warning: .netrc file has incorrect permissions, fixing...[/]")
+                os.chmod(netrc_path, 0o600)
+                self.console.print("[green]✓[/] .netrc permissions corrected")
+                
+            # Check git config
+            success, name = self._run_command('git config --get user.name')
+            success2, email = self._run_command('git config --get user.email')
+            
+            if not success or not success2:
+                self.console.print("[yellow]Git user not configured, setting up...[/]")
+                self._run_command('git config --global user.name "rafstahelin"')
+                self._run_command('git config --global user.email "raf@raf.studio"')
+                self.console.print("[green]✓[/] Git configuration completed")
+                
+            return True
+                
+        except Exception as e:
+            if self.debug_mode:
+                self.console.print(f"[red]Error setting up git credentials: {str(e)}[/]")
+            return False
+
     def sync_git_repo(self):
         """Check git repository status and report differences."""
         self.console.print("\n[bold blue]Checking git repository status...[/]")
+        
+        # Check git credentials first
+        if not self.check_git_credentials():
+            self.console.print("[yellow]Warning: Git credentials setup failed, some operations may be limited[/]")
         
         # Check if repo exists locally
         if not self.file_scripts_path.exists():
@@ -334,7 +377,7 @@ fi
     def run(self):
         """Main execution method."""
         self.console.print("[bold cyan]File-Scripts Setup Tool[/]")
-        self.console.print("[dim]Version: 0.7.0[/]")
+        self.console.print("[dim]Version: 0.8.0[/]")  # Updated version number
         
         steps = [
             (self.cleanup_structure, "Cleaning directory structure"),
@@ -362,3 +405,4 @@ fi
 if __name__ == "__main__":
     tool = Tool()
     tool.run()
+                
