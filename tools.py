@@ -42,7 +42,8 @@ class ToolsManager:
             ],
             "Utilities": [
                 ('download_configs', 'Download Configs', 'OK'),
-                ('debug_crops', 'Debug Crops', '-')
+                ('debug_crops', 'Debug Crops', '-'),
+                ('setup', 'Setup', 'OK')
             ]
         }
 
@@ -55,30 +56,30 @@ class ToolsManager:
 
     def display_menu(self) -> None:
         """Display categorized menu of available tools."""
-        rprint("[magenta]=== File Management Tools ===[/magenta]\n")
+        print()
         
         total_idx = 1
+        first_category = True
         for category_name, tools in self.tool_categories.items():
             table = Table(
                 show_header=False,
                 box=None,
                 show_edge=False,
                 padding=(1, 1),
-                width=60
+                width=55  # Reduced from 60
             )
-
+    
             table.add_column("Tool", style="white", width=45)
             table.add_column("Status", style="yellow", width=10)
-
+    
             for tool_name, description, status in tools:
-                # Add status color based on value
                 status_color = "green" if status == "OK" else "red" if status == "-" else "yellow"
                 table.add_row(
                     f"[yellow]{total_idx}.[/yellow] {description}",
                     f"[{status_color}]{status}[/{status_color}]"
                 )
                 total_idx += 1
-
+    
             panel = Panel(
                 table,
                 title=f"[gold1]{category_name}[/gold1]",

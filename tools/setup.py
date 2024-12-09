@@ -1,38 +1,11 @@
-"""
-Environment Setup Tool
----------------------
-Version: 0.7.0
-Status: Stable
-
-• Git Repository Management:
-  - Syncs file-scripts to latest dev branch
-  - Handles merge conflicts and issues
-  - Reports sync status
-
-• Tools Launcher Setup:
-  - Creates 'tools' command for quick access
-  - Can be run from any directory
-  - Automatic path detection
-
-• WANDB Configuration (RunPod only):
-  - Sets up WANDB API token
-  - Tests connection
-  - Handles authentication issues
-
-Usage:
-    Menu option: 'setup' or shortcut: 'st'
-"""
-
-# Version information
-__version__ = "0.7.0"
-__status__ = "stable"
-
 from pathlib import Path
 import subprocess
 import os
+import shutil
 from rich.console import Console
 from rich.prompt import Confirm
 from rich import print as rprint
+from rich.progress import track
 
 class Tool:
     def __init__(self):
@@ -40,23 +13,16 @@ class Tool:
         self.workspace_path = Path('/workspace')
         self.file_scripts_path = self.workspace_path / 'file-scripts'
         self.is_runpod = self._check_is_runpod()
-        print(f"Running in {'RunPod' if self.is_runpod else 'WSL'} environment")  # Debug print
+        rprint(f"[cyan]Environment:[/] {'[green]RunPod[/]' if self.is_runpod else '[yellow]WSL[/]'}")
+        self.debug_mode = os.getenv('DEBUG', '').lower() == 'true'
 
     def _check_is_runpod(self):
-        """Check if running in RunPod environment."""
-        # Check for both RunPod and general container environment
         is_container = os.path.exists('/.dockerenv')
         is_runpod = os.path.exists('/workspace/.runpod')
-        
-        if is_runpod:
-            return True  # Specifically RunPod
-        elif is_container:
-            return True  # Other container (treat same as RunPod)
-        else:
-            return False  # WSL/local environment
+        return is_runpod or is_container
 
     def _run_command(self, command, cwd=None, shell=True):
-        """Run shell command and handle errors."""
+        """Execute a shell command and return the result."""
         try:
             result = subprocess.run(
                 command,
@@ -68,64 +34,243 @@ class Tool:
             )
             return True, result.stdout
         except subprocess.CalledProcessError as e:
+            if self.debug_mode:
+                self.console.print(f"[yellow]Command failed: {command}[/]")
+                self.console.print(f"[yellow]Error: {e.stderr}[/]")
             return False, f"Error: {e.stderr}"
 
-    def _run_git_command(self, command, cwd=None):
-        """Run git command and handle errors."""
-        return self._run_command(command, cwd)
+    def _safe_remove(self, path: Path):
+        """Safely remove a file or directory with proper error handling."""
+        try:
+            if not path.exists():
+                return True
+
+            if self.debug_mode:
+                self.console.print(f"[dim]Attempting to remove: {path}[/]")
+
+            if path.is_file():
+                path.unlink(missing_ok=True)
+            elif path.is_dir():
+                # Remove contents first
+                for item in path.glob('*'):
+                    self._safe_remove(item)
+                # Then remove the directory
+                try:
+                    path.rmdir()
+                except OSError:
+                    # If rmdir fails, try force remove with shutil
+                    shutil.rmtree(path, ignore_errors=True)
+            return True
+        except Exception as e:
+            if self.debug_mode:
+                self.console.print(f"[yellow]Warning: Failed to remove {path}: {str(e)}[/]")
+            return False
 
     def cleanup_structure(self):
-        """Clean up file-scripts directory structure."""
-        print("Starting cleanup_structure...")  # Debug print
-        self.console.print("\n[bold blue]Cleaning up directory structure...[/]")
+        """Clean up workspace directory structure with improved handling."""
+        self.console.print("\n[bold blue]Cleaning directory structure...[/]")
         
         try:
-            # Remove unnecessary files
-            files_to_remove = [
-                'CURSOR.rules',
-                'paths.json',
-                'requirements.txt'
+            cleanup_patterns = [
+                '**/__pycache__',
+                '**/*.pyc',
+                '**/.DS_Store',
+                '**/Thumbs.db',
+                '**/.ipynb_checkpoints',
+                # Add patterns for pip installation artifacts
+                '**/=*.0',
+                '**/=*.1'
             ]
             
-            for file in files_to_remove:
-                file_path = self.file_scripts_path / file
-                if file_path.exists():
-                    file_path.unlink()
-                    self.console.print(f"[green]✓ Removed {file}[/]")
+            total_cleaned = 0
+            failed_paths = []
+            
+            for pattern in cleanup_patterns:
+                if self.debug_mode:
+                    self.console.print(f"[dim]Scanning for pattern: {pattern}[/]")
+                
+                # Use rglob to handle nested paths
+                for item in self.file_scripts_path.rglob(pattern.replace('**/', '')):
+                    if self._safe_remove(item):
+                        total_cleaned += 1
+                    else:
+                        failed_paths.append(str(item))
 
-            print("Cleanup completed successfully")  # Debug print
+            # Clean up pip installation artifacts directly
+            pip_artifacts = ['=10.0.0', '=2.25.1', '=4.65.0']
+            for artifact in pip_artifacts:
+                artifact_path = self.file_scripts_path / artifact
+                if artifact_path.exists():
+                    if self._safe_remove(artifact_path):
+                        total_cleaned += 1
+                    else:
+                        failed_paths.append(str(artifact_path))
+
+            # Report results
+            if total_cleaned > 0:
+                self.console.print(f"[green]✓[/] Cleaned {total_cleaned} items")
+            
+            if failed_paths:
+                self.console.print("[yellow]Warning: Some items could not be removed:[/]")
+                for path in failed_paths[:5]:
+                    self.console.print(f"[yellow]  - {path}[/]")
+                if len(failed_paths) > 5:
+                    self.console.print(f"[yellow]  ... and {len(failed_paths) - 5} more[/]")
+                return True
+            
+            self.console.print("[green]✓[/] Directory structure cleaned successfully")
             return True
-
+            
         except Exception as e:
-            print(f"Cleanup error: {str(e)}")  # Debug print
-            self.console.print(f"[red]Error cleaning up structure:[/]\n{str(e)}")
+            self.console.print(f"[red]Error during cleanup:[/]\n{str(e)}")
+            if self.debug_mode:
+                import traceback
+                self.console.print(f"[dim]{traceback.format_exc()}[/]")
             return False
+
+    def setup_dependencies(self):
+        """Install required Python packages."""
+        self.console.print("\n[bold blue]Setting up dependencies...[/]")
+        
+        try:
+            # First verify if safetensors is already installed
+            success, output = self._run_command("pip show safetensors")
+            if success:
+                self.console.print("[green]✓[/] safetensors already installed")
+            else:
+                # Install safetensors if not present
+                success, output = self._run_command("pip install safetensors")
+                if not success:
+                    self.console.print("[red]Failed to install safetensors:[/]\n{output}")
+                    return False
+                self.console.print("[green]✓[/] safetensors installed")
+
+            # Install other dependencies with proper version specifiers
+            other_deps = [
+                "rich>=10.0.0",
+                "requests>=2.25.1",
+                "tqdm>=4.65.0"
+            ]
+            
+            for dep in other_deps:
+                # Use pip install without creating version files
+                success, output = self._run_command(f"python -m pip install '{dep}'")
+                if not success:
+                    self.console.print(f"[red]Failed to install {dep}:[/]\n{output}")
+                    return False
+                if self.debug_mode:
+                    self.console.print(f"[dim]Installed {dep}[/]")
+        
+            self.console.print("[green]✓[/] All dependencies installed")
+            return True
+            
+        except Exception as e:
+            self.console.print(f"[red]Error installing dependencies:[/]\n{str(e)}")
+            return False
+
+    def setup_rclone(self):
+        """Configure rclone if config file is present."""
+        self.console.print("\n[bold blue]Configuring rclone...[/]")
+        try:
+            rclone_config_dir = Path(os.path.expanduser('~/.config/rclone'))
+            os.makedirs(rclone_config_dir, exist_ok=True)
+            
+            rclone_src = self.workspace_path / 'rclone.conf'
+            rclone_dst = rclone_config_dir / 'rclone.conf'
+            
+            if not rclone_src.exists():
+                self.console.print("[yellow]Warning: rclone.conf not found in workspace[/]")
+                return True
+
+            shutil.copy2(rclone_src, rclone_dst)
+            self.console.print("[green]✓[/] Configured rclone")
+            return True
+            
+        except Exception as e:
+            self.console.print(f"[red]Error configuring rclone:[/]\n{str(e)}")
+            return False
+
+    def sync_git_repo(self):
+        """Check git repository status and report differences."""
+        self.console.print("\n[bold blue]Checking git repository status...[/]")
+        
+        # Check if repo exists locally
+        if not self.file_scripts_path.exists():
+            self.console.print("[yellow]Repository not found. Cloning...[/]")
+            success, output = self._run_command(
+                "git clone https://github.com/rafstahelin/file-scripts.git /workspace/file-scripts"
+            )
+            if not success:
+                self.console.print(f"[red]Failed to clone repository:[/]\n{output}")
+                return False
+
+        # Get current branch
+        success, current_branch = self._run_command("git rev-parse --abbrev-ref HEAD")
+        if not success:
+            self.console.print("[red]Failed to get current branch[/]")
+            return False
+        
+        self.console.print(f"[green]Current branch:[/] {current_branch.strip()}")
+
+        # Fetch to update remote refs (without merging)
+        success, _ = self._run_command("git fetch --all --quiet")
+        if not success:
+            self.console.print("[yellow]Warning: Failed to fetch from remote[/]")
+        
+        # Check for unpushed commits
+        success, unpushed = self._run_command("git log @{u}..HEAD --oneline")
+        if success and unpushed.strip():
+            self.console.print("\n[yellow]Unpushed commits:[/]")
+            for line in unpushed.strip().split('\n'):
+                self.console.print(f"  {line}")
+        
+        # Check for unstaged changes
+        success, unstaged = self._run_command("git diff --name-status")
+        if success and unstaged.strip():
+            self.console.print("\n[yellow]Unstaged changes:[/]")
+            for line in unstaged.strip().split('\n'):
+                self.console.print(f"  {line}")
+        
+        # Check for staged changes
+        success, staged = self._run_command("git diff --staged --name-status")
+        if success and staged.strip():
+            self.console.print("\n[yellow]Staged changes:[/]")
+            for line in staged.strip().split('\n'):
+                self.console.print(f"  {line}")
+        
+        # Check for untracked files
+        success, untracked = self._run_command("git ls-files --others --exclude-standard")
+        if success and untracked.strip():
+            self.console.print("\n[yellow]Untracked files:[/]")
+            for line in untracked.strip().split('\n'):
+                self.console.print(f"  {line}")
+
+        # Compare with dev branch without merging
+        success, diff_dev = self._run_command("git rev-list --left-right --count origin/dev...HEAD")
+        if success:
+            behind, ahead = map(int, diff_dev.strip().split())
+            if behind > 0:
+                self.console.print(f"\n[yellow]Your branch is behind dev by {behind} commit(s)[/]")
+            if ahead > 0:
+                self.console.print(f"[green]Your branch is ahead of dev by {ahead} commit(s)[/]")
+        
+        self.console.print("\n[green]✓[/] Git status check completed")
+        return True
 
     def setup_tools_shortcut(self):
         """Setup tools.py shortcut command."""
-        print("Starting setup_tools_shortcut...")  # Debug print
         self.console.print("\n[bold blue]Setting up tools launcher shortcut...[/]")
         
         try:
-            # Use /usr/local/bin for the shortcut
-            bin_path = '/usr/local/bin'
-            shortcut_path = f'{bin_path}/tools'
+            bin_path = Path('/usr/local/bin')
+            shortcut_path = bin_path / 'tools'
             
-            print(f"Using bin path: {bin_path}")  # Debug print
-            print(f"Shortcut path: {shortcut_path}")  # Debug print
+            bin_path.mkdir(parents=True, exist_ok=True)
 
-            # Ensure bin directory exists
-            os.makedirs(bin_path, exist_ok=True)
+            if shortcut_path.exists():
+                shortcut_path.unlink()
 
-            # Remove any existing shortcuts
-            if os.path.exists(shortcut_path):
-                print(f"Removing existing shortcut at {shortcut_path}")
-                os.remove(shortcut_path)
-
-            # Create shortcut script
             script_content = """#!/bin/bash
-
-# Find the tools.py script
 if [ -f "/workspace/file-scripts/tools.py" ]; then
     cd /workspace/file-scripts
     python tools.py
@@ -137,155 +282,81 @@ else
     exit 1
 fi
 """
-            print(f"Creating new shortcut at {shortcut_path}")  # Debug print
-            
-            # Write script and set permissions
-            with open(shortcut_path, 'w') as f:
-                f.write(script_content)
-            os.chmod(shortcut_path, 0o755)
+            shortcut_path.write_text(script_content)
+            shortcut_path.chmod(0o755)
 
-            # Update .bashrc
-            bashrc_path = '/root/.bashrc'  # Using root's .bashrc since we're in container
-            print(f"Updating bashrc at {bashrc_path}")  # Debug print
-            
-            if os.path.exists(bashrc_path):
-                with open(bashrc_path, 'r') as f:
-                    bashrc_content = f.read()
+            bashrc_path = Path('/root/.bashrc')
+            if bashrc_path.exists():
+                content = bashrc_path.read_text()
+                if 'alias tools=' not in content:
+                    with bashrc_path.open('a') as f:
+                        f.write('\n# Tools launcher shortcut\n'
+                               'alias tools=\'tools\'\n')
 
-                updates_needed = []
-                if 'alias tools=' not in bashrc_content:
-                    updates_needed.append('\n# Tools launcher shortcut\n'
-                                       'alias tools=\'tools\'\n')
-
-                if updates_needed:
-                    with open(bashrc_path, 'a') as f:
-                        for update in updates_needed:
-                            f.write(update)
-
-            print("Tools shortcut setup completed successfully")  # Debug print
-            self.console.print("[green]✓ Tools launcher shortcut 'tools' installed successfully[/]")
-            self.console.print("[yellow]Note: You'll need to restart your terminal or run 'source ~/.bashrc' to use the shortcut[/]")
+            self.console.print("[green]✓[/] Tools launcher shortcut installed")
             return True
 
         except Exception as e:
-            print(f"Setup tools shortcut error: {str(e)}")  # Debug print
             self.console.print(f"[red]Error setting up tools launcher shortcut:[/]\n{str(e)}")
             return False
 
-    def sync_git_repo(self):
-        """Synchronize git repository with dev branch."""
-        print("Starting sync_git_repo...")  # Debug print
-        self.console.print("\n[bold blue]Syncing git repository...[/]")
-        
-        # Check if repo exists
-        if not self.file_scripts_path.exists():
-            print("Repository not found, attempting to clone...")  # Debug print
-            self.console.print("[yellow]Repository not found. Cloning...[/]")
-            success, output = self._run_git_command(
-                "git clone https://github.com/rafstahelin/file-scripts.git /workspace/file-scripts"
-            )
-            if not success:
-                print(f"Clone failed: {output}")  # Debug print
-                self.console.print(f"[red]Failed to clone repository:[/]\n{output}")
-                return False
-        
-        # Sync repository
-        commands = [
-            "git fetch --all --prune",
-            "git checkout dev",
-            "git pull origin dev"
-        ]
-        
-        for cmd in commands:
-            print(f"Running git command: {cmd}")  # Debug print
-            success, output = self._run_git_command(cmd)
-            if not success:
-                print(f"Git command failed: {output}")  # Debug print
-                self.console.print(f"[red]Failed to execute '{cmd}':[/]\n{output}")
-                return False
-            
-        print("Git sync completed successfully")  # Debug print
-        self.console.print("[green]✓ Git repository synced successfully[/]")
-        return True
-
     def setup_wandb(self):
         """Configure Weights & Biases API token."""
-        print("Starting setup_wandb...")  # Debug print
         self.console.print("\n[bold blue]Setting up Weights & Biases...[/]")
         
         if not self.is_runpod:
-            print("Not in RunPod environment, skipping WANDB setup")  # Debug print
             self.console.print("[yellow]Skipping WANDB setup in WSL environment[/]")
             return True
-            
+                
         try:
             wandb_key = os.getenv('WANDB_API_KEY')
             if not wandb_key:
-                print("WANDB_API_KEY not found in environment")  # Debug print
-                self.console.print("[yellow]WANDB API key not found in environment variables[/]")
+                self.console.print("[yellow]WANDB API key not found in environment[/]")
                 self.console.print("[yellow]Skipping WANDB setup - add WANDB_API_KEY to your environment if needed[/]")
-                return True  # Return True as this isn't a failure case
-            
-            # Configure WANDB only if key exists
+                return True
+
             os.environ['WANDB_API_KEY'] = wandb_key
             
-            # Test WANDB login
-            print("Testing WANDB login...")  # Debug print
-            result = subprocess.run(
-                ['wandb', 'login', '--relogin'],
-                capture_output=True,
-                text=True
-            )
-            
-            if result.returncode == 0:
-                print("WANDB login successful")  # Debug print
-                self.console.print("[green]✓ WANDB configured successfully[/]")
-                return True
-            else:
-                print("WANDB login attempt failed, but continuing...")  # Debug print
+            success, output = self._run_command('wandb login --relogin')
+            if not success:
                 self.console.print("[yellow]WANDB login failed, but continuing...[/]")
                 self.console.print("[yellow]You can set up WANDB manually later if needed[/]")
-                return True  # Return True as this isn't a critical failure
-                
+                return True
+
+            self.console.print("[green]✓[/] WANDB configured successfully")
+            return True
+                    
         except Exception as e:
-            print(f"WANDB setup error: {str(e)}")  # Debug print
             self.console.print(f"[yellow]WANDB setup skipped: {str(e)}[/]")
             self.console.print("[yellow]You can set up WANDB manually later if needed[/]")
-            return True  # Return True as this isn't a critical failure
+            return True
 
     def run(self):
-        """Main tool execution flow."""
-        print("====SETUP TOOL DEBUG====")  # Debug print
-        print("Setup tool starting...")  # Debug print
-        
-        # Print the module's docstring as a header
-        self.console.print(__doc__)
+        """Main execution method."""
+        self.console.print("[bold cyan]File-Scripts Setup Tool[/]")
+        self.console.print("[dim]Version: 0.7.0[/]")
         
         steps = [
-            (self.cleanup_structure, "Directory structure cleanup"),
-            (self.sync_git_repo, "Git synchronization"),
-            (self.setup_tools_shortcut, "Tools launcher setup"),
-            (self.setup_wandb, "WANDB configuration")
+            (self.cleanup_structure, "Cleaning directory structure"),
+            (self.setup_dependencies, "Installing dependencies"),
+            (self.setup_rclone, "Configuring rclone"),
+            (self.sync_git_repo, "Checking git repository"),
+            (self.setup_tools_shortcut, "Setting up tools launcher"),
+            (self.setup_wandb, "Configuring WANDB")
         ]
         
-        print("About to start steps...")  # Debug print
-        print(f"Found {len(steps)} steps to execute")  # Debug print
-        
         success = True
-        for step_func, step_name in steps:
-            print(f"Running step: {step_name}")  # Debug print
+        for step_func, step_name in track(steps, description="[cyan]Setting up environment...[/]"):
             if not step_func():
-                self.console.print(f"\n[red]Failed at step: {step_name}[/]")
+                self.console.print(f"\n[red]✗ Failed:[/] {step_name}")
                 success = False
-                if not Confirm.ask("Continue with remaining steps?"):
+                if not Confirm.ask("[yellow]Continue with remaining steps?[/]"):
                     break
         
         status = "[green]✓ Setup completed successfully[/]" if success else "[yellow]⚠ Setup completed with warnings[/]"
         self.console.print(f"\n{status}")
         
-        print("Setup tool finished")  # Debug print
-        
-        if Confirm.ask("\nPress Enter to return to main menu"):
+        if Confirm.ask("\nReturn to main menu?"):
             return
 
 if __name__ == "__main__":
