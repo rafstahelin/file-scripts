@@ -64,8 +64,10 @@ class ToolsManager:
         shortcuts = [
             ('tools', 'Launch tools menu'),
             ('config', 'Navigate to configs directory'),
+            ('data', 'Navigate to datasets directory'),
             ('out', 'Navigate to output directory'),
-            ('flux', 'Navigate to flux directory')
+            ('flux', 'Navigate to flux directory'),
+            ('scripts', 'Navigate to scripts directory')
         ]
         
         table = Table(
@@ -75,16 +77,16 @@ class ToolsManager:
             padding=(1, 1),
             width=55
         )
-
+    
         table.add_column("Command", style="white", width=15)
         table.add_column("Description", style="white", width=40)
-
+    
         for idx, (shortcut, description) in enumerate(shortcuts, 1):
             table.add_row(
                 f"[yellow]{idx}.[/yellow] [cyan]{shortcut}[/cyan]",
                 description
             )
-
+    
         panel = Panel(
             table,
             title="[gold1]Shortcuts[/gold1]",
