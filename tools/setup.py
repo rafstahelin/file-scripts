@@ -301,46 +301,60 @@ password your_pat_token""")
         return True
 
     def setup_tools_shortcut(self):
-        """Setup tools.py shortcut command."""
-        self.console.print("\n[bold blue]Setting up tools launcher shortcut...[/]")
+        """Setup tools.py shortcut and navigation aliases that persist in network volume."""
+        self.console.print("\n[bold blue]Setting up shortcuts...[/]")
         
         try:
+            # Create shortcuts in /usr/local/bin
             bin_path = Path('/usr/local/bin')
-            shortcut_path = bin_path / 'tools'
-            
             bin_path.mkdir(parents=True, exist_ok=True)
-
-            if shortcut_path.exists():
-                shortcut_path.unlink()
-
-            script_content = """#!/bin/bash
-if [ -f "/workspace/file-scripts/tools.py" ]; then
-    cd /workspace/file-scripts
-    python tools.py
-elif [ -f "./file-scripts/tools.py" ]; then
-    cd ./file-scripts
-    python tools.py
-else
-    echo "Error: Could not find tools.py. Are you in the workspace directory?"
-    exit 1
-fi
-"""
-            shortcut_path.write_text(script_content)
-            shortcut_path.chmod(0o755)
-
+            
+            # Setup the tools launcher
+            tools_script = """#!/bin/bash
+    if [ -f "/workspace/file-scripts/tools.py" ]; then
+        cd /workspace/file-scripts
+        python tools.py
+    elif [ -f "./file-scripts/tools.py" ]; then
+        cd ./file-scripts
+        python tools.py
+    else
+        echo "Error: Could not find tools.py. Are you in the workspace directory?"
+        exit 1
+    fi
+    """
+            tools_path = bin_path / 'tools'
+            if tools_path.exists():
+                tools_path.unlink()
+            tools_path.write_text(tools_script)
+            tools_path.chmod(0o755)
+    
+            # Setup navigation aliases in persistent bashrc with correct paths
             bashrc_path = Path('/root/.bashrc')
             if bashrc_path.exists():
-                content = bashrc_path.read_text()
-                if 'alias tools=' not in content:
+                current_content = bashrc_path.read_text()
+                
+                # Define navigation shortcuts with correct paths
+                navigation_aliases = """
+    # Tools shortcuts
+    alias tools='tools'
+    
+    # Navigation shortcuts for workspace paths
+    alias config='cd /workspace/SimpleTuner/configs'
+    alias out='cd /workspace/SimpleTuner/output'
+    alias flux='cd /workspace/StableSwarmUI/Models/loras/flux'
+    """
+                if '# Tools shortcuts' not in current_content:
                     with bashrc_path.open('a') as f:
-                        f.write('\n# Tools launcher shortcut\n'
-                               'alias tools=\'tools\'\n')
-
-            self.console.print("[green]✓[/] Tools launcher shortcut installed")
+                        f.write(navigation_aliases)
+    
+            self.console.print("[green]✓[/] Shortcuts installed successfully")
+            self.console.print("[dim]Note: Shortcuts are installed in the network volume and will persist across sessions[/]")
+            self.console.print("[dim]Note: Run 'source ~/.bashrc' or restart your terminal to use the navigation shortcuts[/]")
+            
             return True
-
+    
         except Exception as e:
-            self.console.print(f"[red]Error setting up tools launcher shortcut:[/]\n{str(e)}")
+            self.console.print(f"[red]Error setting up shortcuts:[/]\n{str(e)}")
             return False
 
     def setup_wandb(self):
@@ -357,7 +371,7 @@ fi
                 self.console.print("[yellow]WANDB API key not found in environment[/]")
                 self.console.print("[yellow]Skipping WANDB setup - add WANDB_API_KEY to your environment if needed[/]")
                 return True
-
+    
             os.environ['WANDB_API_KEY'] = wandb_key
             
             success, output = self._run_command('wandb login --relogin')
@@ -365,7 +379,7 @@ fi
                 self.console.print("[yellow]WANDB login failed, but continuing...[/]")
                 self.console.print("[yellow]You can set up WANDB manually later if needed[/]")
                 return True
-
+    
             self.console.print("[green]✓[/] WANDB configured successfully")
             return True
                     
@@ -373,7 +387,7 @@ fi
             self.console.print(f"[yellow]WANDB setup skipped: {str(e)}[/]")
             self.console.print("[yellow]You can set up WANDB manually later if needed[/]")
             return True
-
+    
     def run(self):
         """Main execution method."""
         self.console.print("[bold cyan]File-Scripts Setup Tool[/]")

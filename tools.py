@@ -25,13 +25,20 @@ class ToolsManager:
 
         # Tool categories and their tools
         self.tool_categories = {
-            "Model Management": [
-                ('config_manager', 'Config Manager', 'OK'),
-                ('lora_mover', 'LoRA Mover', 'OK'),
-                ('metadata_reader', 'Metadata Reader', 'OK')
+            "Training": [
+                ('train', 'Train', '-'),
+                ('set_config', 'Set Config', '-'),
+                ('set_prompts', 'Set Prompts', '-'),
+                ('config_manager', 'Config Manager', 'OK')
             ],
-            "Development Tools": [
-                ('validation_grid', 'Validation Grid', 'OK')
+            "File Management": [
+                ('lora_mover', 'LoRA Manager', 'OK'),
+                ('metadata_reader', 'Metadata Reader', 'OK'),
+                ('download_configs', 'Download Configs', 'OK')
+            ],
+            "Dev Tools": [
+                ('validation_grid', 'Validation Grid', 'OK'),
+                ('debug_crops', 'Debug Crops', '-')
             ],
             "Cleanup Tools": [
                 ('delete_models', 'Delete Models', 'OK'),
@@ -41,8 +48,6 @@ class ToolsManager:
                 ('remove_checkpoints', 'Remove Checkpoints', 'OK')
             ],
             "Utilities": [
-                ('download_configs', 'Download Configs', 'OK'),
-                ('debug_crops', 'Debug Crops', '-'),
                 ('setup', 'Setup', 'OK')
             ]
         }
@@ -53,6 +58,42 @@ class ToolsManager:
         for category in self.tool_categories.values():
             all_tools.extend(category)
         return all_tools
+
+    def display_shortcuts(self) -> None:
+        """Display shortcuts using the same Panel and Table format."""
+        shortcuts = [
+            ('tools', 'Launch tools menu'),
+            ('config', 'Navigate to configs directory'),
+            ('out', 'Navigate to output directory'),
+            ('flux', 'Navigate to flux directory')
+        ]
+        
+        table = Table(
+            show_header=False,
+            box=None,
+            show_edge=False,
+            padding=(1, 1),
+            width=55
+        )
+
+        table.add_column("Command", style="white", width=15)
+        table.add_column("Description", style="white", width=40)
+
+        for idx, (shortcut, description) in enumerate(shortcuts, 1):
+            table.add_row(
+                f"[yellow]{idx}.[/yellow] [cyan]{shortcut}[/cyan]",
+                description
+            )
+
+        panel = Panel(
+            table,
+            title="[gold1]Shortcuts[/gold1]",
+            border_style="blue",
+            width=60,
+            padding=(1, 1)
+        )
+        self.console.print(panel)
+        print()
 
     def display_menu(self) -> None:
         """Display categorized menu of available tools."""
@@ -66,7 +107,7 @@ class ToolsManager:
                 box=None,
                 show_edge=False,
                 padding=(1, 1),
-                width=55  # Reduced from 60
+                width=55
             )
     
             table.add_column("Tool", style="white", width=45)
@@ -90,6 +131,9 @@ class ToolsManager:
             self.console.print(panel)
             print()
 
+        # Display shortcuts at the end
+        self.display_shortcuts()
+
     def get_tool_by_input(self, user_input: str) -> Optional[str]:
         """Get tool name from user input number."""
         all_tools = self.get_all_tools()
@@ -103,8 +147,6 @@ class ToolsManager:
             pass
 
         return None
-
-    # [Rest of the class methods remain unchanged...]
 
     def run_tool(self, tool_name: str) -> None:
         """Run a specific tool."""
