@@ -8,3 +8,6 @@ venv/
 .idea/
 .vscode/
 *.log
+.ipynb_checkpoints/
+**/.ipynb_checkpoints/
+*-Copy1.py
