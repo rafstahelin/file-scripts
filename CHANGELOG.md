@@ -1,5 +1,35 @@
 # Changelog
 
+Changelog
+[0.8.2] - 2024-12-10
+Added
+
+New Training tool implementation:
+
+Interactive config selection interface
+Automatic config directory scanning
+Direct training launch capability
+Environment variable handling
+
+
+Comprehensive documentation:
+
+Added train.md documentation
+Updated tools.py menu structure
+
+
+
+Fixed
+
+UI improvements in train tool:
+
+Fixed duplicate loading messages
+Improved spacing in output
+Enhanced user interface feedback
+
+
+
+[0.8.0] - 2024-12-09
 ## [0.8.0] - 2024-12-09
 ### Added
 - New tools implemented:
