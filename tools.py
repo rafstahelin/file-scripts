@@ -26,13 +26,13 @@ class ToolsManager:
         # Tool categories and their tools
         self.tool_categories = {
             "Training": [
-                ("train", "train", "ok"),
+                ("train", "train", "OK"),
                 ('set_config', 'Set Config', '-'),
                 ('set_prompts', 'Set Prompts', '-'),
                 ('config_manager', 'Config Manager', 'OK')
             ],
             "File Management": [
-                ('lora_mover', 'LoRA Manager', 'OK'),
+                ('lora_mover', 'LoRA Mover', 'OK'),
                 ('metadata_reader', 'Metadata Reader', 'OK'),
                 ('download_configs', 'Download Configs', 'OK')
             ],
