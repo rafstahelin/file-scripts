@@ -26,7 +26,7 @@ class ToolsManager:
         # Tool categories and their tools
         self.tool_categories = {
             "Training": [
-                ('train', 'Train', '-'),
+                ("train", "train", "ok"),
                 ('set_config', 'Set Config', '-'),
                 ('set_prompts', 'Set Prompts', '-'),
                 ('config_manager', 'Config Manager', 'OK')
