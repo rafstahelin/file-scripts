@@ -1,48 +1,53 @@
 # Setup Tool Documentation
+Version: 0.8.0
+Last Updated: 2024-12-10
 
 ## Overview
-The setup tool provides automated environment setup and configuration management for the file-scripts project. It handles dependency verification, git status checks, and environment preparation.
+The setup tool provides automated initialization and configuration of the file-scripts environment, including navigation shortcuts, dependencies, and workspace organization.
 
-## Core Features
-- Environment validation and setup
-- Git status management and verification
-- Dependency resolution and installation
-- Automated configuration handling
+## Features
+- Automated dependency installation
+- Navigation shortcut configuration
+- Git repository synchronization
+- WANDB configuration (RunPod only)
+- Tool launcher setup
 
-## Environment Requirements
-- Python 3.8+
-- Git client
-- Read/write permissions in the project directory
+## Navigation Shortcuts
+The following shortcuts are configured for quick directory access:
 
-## Usage Examples
-```bash
-# Basic setup
-python tools/setup.py
+| Shortcut | Path | Description |
+|----------|------|-------------|
+| `tools`  | N/A  | Launch tools menu |
+| `config` | `/workspace/SimpleTuner/config` | Configuration directory |
+| `data`   | `/workspace/SimpleTuner/datasets` | Datasets directory |
+| `out`    | `/workspace/SimpleTuner/output` | Output directory |
+| `flux`   | `/workspace/StableSwarmUI/Models/loras/flux` | Flux models directory |
+| `scripts`| `/workspace/file-scripts` | Scripts directory |
 
-# Setup with debug mode
-python tools/setup.py --debug
+## Usage
+1. Initial Setup:
+   ```bash
+   python setup.py
+   ```
 
-# Verify environment only
-python tools/setup.py --verify
-```
+2. Activating Shortcuts:
+   ```bash
+   source ~/.bashrc
+   ```
 
-## Command Reference
-- `--debug`: Enable detailed logging and debug output
-- `--verify`: Perform environment verification without making changes
-- `--force`: Override safety checks and force setup execution
-- `--skip-git`: Skip git-related checks and operations
+## Environment Support
+- Fully supported in RunPod environment
+- WSL/local environment support with path adaptations
+- Persistent shortcuts in network volume
 
-## Debug Mode
-Debug mode provides enhanced logging and validation:
-1. Detailed dependency checking
-2. Environment variable tracing
-3. Step-by-step operation logging
-4. Full error stack traces
+## Technical Details
+- Shortcuts are installed in `/usr/local/bin`
+- Configuration persists in `~/.bashrc`
+- Compatible with PyTorch240 container
+- Automatic path validation and creation
 
-## Dependencies
-- PyGit2: Git operations and repository management
-- ConfigParser: Configuration file handling
-- PathLib: Cross-platform path operations
-- Logging: Debug and operation logging
-- JSONSchema: Configuration validation
-- Requests: External resource fetching
+## Best Practices
+1. Run setup tool after container initialization
+2. Verify shortcuts after setup
+3. Use `source ~/.bashrc` if shortcuts don't activate automatically
+4. Check environment variables for WANDB configuration

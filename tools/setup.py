@@ -331,7 +331,26 @@ password your_pat_token""")
             # Setup navigation aliases in persistent bashrc with correct paths
             bashrc_path = Path('/root/.bashrc')
             if bashrc_path.exists():
+                # Read current content
                 current_content = bashrc_path.read_text()
+                
+                # Remove old shortcuts section if it exists
+                if '# Tools shortcuts' in current_content:
+                    lines = current_content.split('\n')
+                    new_lines = []
+                    skip_mode = False
+                    
+                    for line in lines:
+                        if '# Tools shortcuts' in line:
+                            skip_mode = True
+                            continue
+                        if skip_mode and line.strip() == '':
+                            skip_mode = False
+                            continue
+                        if not skip_mode:
+                            new_lines.append(line)
+                    
+                    current_content = '\n'.join(new_lines)
                 
                 # Define navigation shortcuts with correct paths
                 navigation_aliases = """
@@ -339,17 +358,24 @@ password your_pat_token""")
     alias tools='tools'
     
     # Navigation shortcuts for workspace paths
-    alias config='cd /workspace/SimpleTuner/configs'
+    alias config='cd /workspace/SimpleTuner/config'
+    alias data='cd /workspace/SimpleTuner/datasets'
     alias out='cd /workspace/SimpleTuner/output'
     alias flux='cd /workspace/StableSwarmUI/Models/loras/flux'
+    alias scripts='cd /workspace/file-scripts'
     """
-                if '# Tools shortcuts' not in current_content:
-                    with bashrc_path.open('a') as f:
-                        f.write(navigation_aliases)
+                # Write the updated content back
+                with bashrc_path.open('w') as f:
+                    f.write(current_content.rstrip() + '\n' + navigation_aliases)
+    
+                # Try to reload bashrc
+                success, output = self._run_command('source ~/.bashrc')
+                if not success:
+                    self.console.print("[yellow]Warning: Could not automatically reload bashrc[/]")
+                    self.console.print("[yellow]Please run 'source ~/.bashrc' manually[/]")
     
             self.console.print("[green]✓[/] Shortcuts installed successfully")
             self.console.print("[dim]Note: Shortcuts are installed in the network volume and will persist across sessions[/]")
-            self.console.print("[dim]Note: Run 'source ~/.bashrc' or restart your terminal to use the navigation shortcuts[/]")
             
             return True
     
