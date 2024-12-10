@@ -1,291 +1,223 @@
 import os
-import json
 import subprocess
 from pathlib import Path
-from typing import List, Dict, Optional
+from typing import Optional, List, Dict, Tuple
 from rich.console import Console
-from rich.progress import Progress, TextColumn, BarColumn, TaskProgressColumn
 from rich.table import Table
 from rich.panel import Panel
 from rich.columns import Columns
 from rich import print as rprint
-from rich.prompt import Prompt
 
 class Tool:
     def __init__(self):
         self.console = Console()
         self.base_path = Path('/workspace/SimpleTuner/config')
-        self.paths_config = Path('/workspace/file-scripts/paths.json')
-        
-    def clear_screen(self):
-        """Clear terminal screen."""
-        os.system('clear' if os.name == 'posix' else 'cls')
-        
+        self.dropbox_base = "dbx:/studio/ai/data/1models"
+        self.excluded_dirs = {'.ipynb_checkpoints', 'templates'}
+
     def verify_paths(self) -> bool:
-        """Verify that required paths exist."""
         if not self.base_path.exists():
-            rprint(f"[red]Error: Config directory {self.base_path} does not exist[/red]")
+            rprint(f"[red]Error: Base config directory not found at {self.base_path}[/red]")
             return False
-        if not self.paths_config.exists():
-            rprint(f"[red]Error: paths.json not found at {self.paths_config}[/red]")
+        try:
+            result = self._run_rclone_command(["lsf", self.dropbox_base])
+            if not result:
+                return False
+        except Exception as e:
+            rprint(f"[red]Error checking Dropbox access: {str(e)}[/red]")
             return False
         return True
 
-    def load_paths_config(self) -> Dict:
-        """Load paths configuration from paths.json."""
+    def _run_rclone_command(self, args: List[str], check_output: bool = True) -> Optional[str]:
         try:
-            with open(self.paths_config) as f:
-                return json.load(f)
+            cmd = ["rclone"] + args
+            result = subprocess.run(cmd, capture_output=True, text=True)
+            if result.returncode != 0:
+                rprint(f"[red]Rclone command failed: {result.stderr}[/red]")
+                return None
+            return result.stdout if check_output else ""
         except Exception as e:
-            rprint(f"[red]Error loading paths configuration: {str(e)}[/red]")
-            return {}
+            rprint(f"[red]Error running rclone command: {str(e)}[/red]")
+            return None
 
-    def get_dropbox_path(self, token_name: str) -> Optional[str]:
-        """Get Dropbox path for a given token from paths.json."""
-        paths_config = self.load_paths_config()
-        token_base = token_name.split('-')[0]
+    def find_matching_dropbox_folder(self, base_name: str) -> Optional[str]:
+        result = self._run_rclone_command([
+            "lsf", self.dropbox_base,
+            "--dirs-only",
+            "-R",
+            "--max-depth", "1"
+        ])
         
-        if token_base in paths_config:
-            base_path = paths_config[token_base]['path']
-            return f"{base_path}/4training/config"
+        if not result:
+            return None
+
+        matches = []
+        for folder in result.splitlines():
+            folder = folder.strip('/')
+            if not folder:
+                continue
+                
+            score = 0
+            folder_lower = folder.lower()
+            base_name_lower = base_name.lower()
+            
+            if base_name_lower in folder_lower:
+                score += 10
+                if any(c.isdigit() for c in folder):
+                    score += 5
+                matches.append((score, folder))
+
+        if matches:
+            matches.sort(key=lambda x: (-x[0], len(x[1])))
+            best_match = matches[0][1]
+            rprint(f"[cyan]Found matching Dropbox folder: {best_match}[/cyan]")
+            return best_match
+            
+        rprint(f"[yellow]No matching Dropbox folder found for {base_name}[/yellow]")
         return None
 
-    def show_progress(self, description: str, progress_task=None) -> None:
-        """Show a progress bar with the given description."""
-        if progress_task:
-            progress_task.update(description=description)
-        else:
-            with Progress(
-                TextColumn("[bold blue]{task.description}"),
-                BarColumn(complete_style="green"),
-                TaskProgressColumn(),
-                console=self.console,
-                transient=True
-            ) as progress:
-                task = progress.add_task(description, total=100)
-                while not progress.finished:
-                    progress.update(task, advance=1)
-                    import time
-                    time.sleep(0.02)
+    def download_config(self, source_path: Path, base_name: str) -> bool:
+        dropbox_folder = self.find_matching_dropbox_folder(base_name)
+        if not dropbox_folder:
+            return False
 
-    def list_token_paths(self) -> List[str]:
-        """List all token directories in the config path."""
+        dest_path = f"{self.dropbox_base}/{dropbox_folder}/4training/config/{source_path.name}"
+        dest_path = dest_path.replace('//', '/')
+
+        mkdir_result = self._run_rclone_command([
+            "mkdir",
+            f"{self.dropbox_base}/{dropbox_folder}/4training/config"
+        ], check_output=False)
+        
+        if mkdir_result is None:
+            return False
+
+        rprint(f"[cyan]Copying {source_path.name} to {dest_path}[/cyan]")
+        copy_result = self._run_rclone_command([
+            "copy",
+            "--checksum",
+            str(source_path),
+            dest_path,
+            "-v",
+            "--progress",
+            "--exclude", ".ipynb_checkpoints/**"
+        ], check_output=False)
+        
+        if copy_result is not None:
+            rprint(f"[green]Successfully downloaded {source_path.name}[/green]")
+            return True
+        return False
+
+    def download_config_group(self, base_name: str) -> bool:
+        dropbox_folder = self.find_matching_dropbox_folder(base_name)
+        if not dropbox_folder:
+            return False
+
+        configs = list(self.base_path.glob(f"{base_name}-*"))
+        if not configs:
+            rprint(f"[yellow]No configs found matching {base_name}[/yellow]")
+            return False
+
+        success = True
+        for config in configs:
+            if not self.download_config(config, base_name):
+                success = False
+                rprint(f"[red]Failed to download {config.name}[/red]")
+
+        return success
+
+    def get_config_dirs(self) -> List[Path]:
         try:
-            token_paths = [f.name for f in self.base_path.iterdir() 
-                          if f.is_dir() and f.name not in ['.ipynb_checkpoints']]
-            
-            if not token_paths:
-                rprint("[yellow]No token paths found in config directory[/yellow]")
-                return []
-            
-            # Group tokens by base name
-            grouped = {}
-            for token in sorted(token_paths):
-                base_name = token.split('-', 1)[0]
-                grouped.setdefault(base_name, []).append(token)
-            
-            panels = []
-            ordered_tokens = []
-            index = 1
-            
-            for base_name in sorted(grouped.keys()):
-                table = Table(show_header=False, show_edge=False, box=None, padding=(0,1))
-                table.add_column(justify="left", no_wrap=False, overflow='fold', max_width=30)
-                
-                for token in sorted(grouped[base_name], key=str.lower, reverse=True):
-                    table.add_row(f"[yellow]{index}. {token}[/yellow]")
-                    ordered_tokens.append(token)
-                    index += 1
-                    
-                panels.append(Panel(table, title=f"[magenta]{base_name}[/magenta]", 
-                                  border_style="blue", width=36))
-            
-            # Display panels in rows of three
-            panels_per_row = 3
-            for i in range(0, len(panels), panels_per_row):
-                row_panels = panels[i:i + panels_per_row]
-                while len(row_panels) < panels_per_row:
-                    row_panels.append(Panel("", border_style="blue", width=36))
-                self.console.print(Columns(row_panels, equal=True, expand=True))
-                
-            return ordered_tokens
-            
+            return [
+                d for d in self.base_path.iterdir()
+                if d.is_dir() and d.name not in self.excluded_dirs
+            ]
         except Exception as e:
             rprint(f"[red]Error scanning config directory: {str(e)}[/red]")
             return []
 
-    def list_config_versions(self, token_path: str) -> List[str]:
-        """List all configuration versions for a given token."""
-        try:
-            version_path = self.base_path / token_path
-            versions = [f.name for f in version_path.iterdir() 
-                       if f.is_dir() and f.name not in ['.ipynb_checkpoints']]
-            
-            if not versions:
-                rprint(f"[yellow]No configurations found for token {token_path}[/yellow]")
-                return []
-            
-            # Create single panel with all versions in reverse order
+    def display_configs(self, configs: List[Path]) -> List:
+        grouped = {}
+        for config in sorted(configs, key=lambda x: x.name):
+            base_name = config.name.split('-')[0]
+            grouped.setdefault(base_name, []).append(config)
+
+        panels = []
+        ordered_configs = []
+        counter = 1
+        
+        for base_name, group_configs in sorted(grouped.items()):
             table = Table(show_header=False, show_edge=False, box=None, padding=(0,1))
             table.add_column(justify="left", no_wrap=False, overflow='fold', max_width=30)
             
-            ordered_versions = sorted(versions, key=str.lower, reverse=True)
-            for idx, version in enumerate(ordered_versions, 1):
-                table.add_row(f"[yellow]{idx}. {version}[/yellow]")
+            table.add_row(f"[yellow]{counter}. {base_name} all[/yellow]")
+            ordered_configs.append(("group", base_name, group_configs))
+            counter += 1
             
-            # Create panel with token name as title
-            panel = Panel(table, title=f"[magenta]{token_path}[/magenta]", 
-                         border_style="blue", width=36)
-            
-            # Display with two empty panels for consistent layout
-            panels = [
-                panel,
-                Panel("", border_style="blue", width=36),
-                Panel("", border_style="blue", width=36)
-            ]
-            self.console.print(Columns(panels, equal=True, expand=True))
-            
-            return ordered_versions
-            
-        except Exception as e:
-            rprint(f"[red]Error scanning versions: {str(e)}[/red]")
-            return []
+            for config in sorted(group_configs, key=lambda x: x.name):
+                table.add_row(f"[yellow]{counter}. {config.name}[/yellow]")
+                ordered_configs.append(("single", config.name, config))
+                counter += 1
+                
+            panels.append(Panel(table, title=f"[magenta]{base_name}[/magenta]", 
+                              border_style="blue", width=36))
 
-    def download_config(self, token_path: str, version: Optional[str] = None) -> bool:
-        """Download configuration(s) to Dropbox."""
+        panels_per_row = 3
+        for i in range(0, len(panels), panels_per_row):
+            row_panels = panels[i:i + panels_per_row]
+            self.console.print(Columns(row_panels, equal=True, expand=True))
+
+        return ordered_configs
+
+    def process_selection(self, selection: str, ordered_configs: List) -> tuple[Optional[str], Optional[Path]]:
         try:
-            # Get Dropbox destination path
-            dropbox_path = self.get_dropbox_path(token_path)
-            if not dropbox_path:
-                rprint(f"[red]No Dropbox path configured for token {token_path}[/red]")
-                return False
+            idx = int(selection) - 1
+            if 0 <= idx < len(ordered_configs):
+                entry_type, name, data = ordered_configs[idx]
+                return (entry_type, data if entry_type == "single" else name)
+            rprint("[red]Invalid selection[/red]")
+            return None, None
+        except ValueError:
+            rprint("[red]Invalid input[/red]")
+            return None, None
 
-            # Prepare source path
-            source_base = self.base_path / token_path
-            if version:
-                source_path = source_base / version
-                if not source_path.exists():
-                    rprint(f"[red]Configuration path does not exist: {source_path}[/red]")
-                    return False
-            else:
-                source_path = source_base
-
-            # Confirm download
-            rprint(f"\n[yellow]About to download configuration(s):[/yellow]")
-            rprint(f"[cyan]From: {source_path}[/cyan]")
-            rprint(f"[cyan]To: {dropbox_path}[/cyan]")
-            
-            confirm = Prompt.ask(
-                "\nProceed with download?",
-                choices=["y", "n"],
-                default="n"
-            )
-            
-            if confirm.lower() != 'y':
-                rprint("[yellow]Operation cancelled[/yellow]")
-                return False
-
-            # Prepare rclone command
-            cmd = [
-                "rclone",
-                "copy",
-                "--checksum",
-                str(source_path),
-                str(dropbox_path),
-                "--progress"
-            ]
-
-            # Execute download with progress tracking
-            with Progress(
-                TextColumn("[bold blue]{task.description}"),
-                BarColumn(complete_style="green"),
-                TaskProgressColumn(),
-                console=self.console,
-                transient=True
-            ) as progress:
-                task = progress.add_task("Starting download...", total=100)
-                
-                process = subprocess.Popen(
-                    cmd,
-                    stdout=subprocess.PIPE,
-                    stderr=subprocess.STDOUT,
-                    universal_newlines=True
-                )
-                
-                # Update progress
-                while True:
-                    if process.poll() is not None:
-                        break
-                    progress.update(task, advance=1)
-                    import time
-                    time.sleep(0.1)
-                
-                # Check result
-                if process.returncode == 0:
-                    self.show_progress("Download complete", task)
-                    rprint(f"[green]Successfully downloaded configuration(s)[/green]")
-                    return True
-                else:
-                    rprint("[red]Error during download[/red]")
-                    return False
-                    
-        except Exception as e:
-            rprint(f"[red]Error downloading configuration: {str(e)}[/red]")
-            return False
+    def clear_screen(self):
+        os.system('clear' if os.name == 'posix' else 'cls')
 
     def run(self):
-        """Main execution method."""
         self.clear_screen()
         
         if not self.verify_paths():
             return
-            
-        rprint("[magenta]=== Configuration Download Tool ===[/magenta]\n")
-        
-        # Choose download mode
-        rprint("[cyan]Select download mode:[/cyan]")
-        rprint("[yellow]1. Download single configuration[/yellow]")
-        rprint("[yellow]2. Download all configurations for a token[/yellow]")
-        
-        mode = Prompt.ask("\nEnter choice", choices=["1", "2"]).strip()
-        
-        # List and select token
-        rprint("\n[cyan]Available Tokens:[/cyan]")
-        tokens = self.list_token_paths()
-        if not tokens:
-            return
-            
-        token_num = Prompt.ask("\nEnter number to select token").strip()
-        if not token_num:
-            rprint("[red]Exited--no input given[/red]")
-            return
-            
-        try:
-            selected_token = tokens[int(token_num) - 1]
-        except (ValueError, IndexError):
-            rprint("[red]Invalid selection[/red]")
+
+        configs = self.get_config_dirs()
+        if not configs:
+            rprint("[yellow]No config directories found to process[/yellow]")
             return
 
-        if mode == "1":
-            # Single configuration mode
-            rprint("\n[cyan]Available Configurations:[/cyan]")
-            versions = self.list_config_versions(selected_token)
-            if not versions:
-                return
-                
-            version_num = Prompt.ask("\nEnter number to select configuration").strip()
-            if not version_num:
-                rprint("[red]Exited--no input given[/red]")
-                return
-                
+        while True:
+            rprint("\n[cyan]Available configurations:[/cyan]")
+            ordered_configs = self.display_configs(configs)
+
             try:
-                selected_version = versions[int(version_num) - 1]
-            except (ValueError, IndexError):
-                rprint("[red]Invalid selection[/red]")
-                return
-                
-            # Download single configuration
-            self.download_config(selected_token, selected_version)
-        else:
-            # Download all configurations for token
-            self.download_config(selected_token)
+                selection = input("\nEnter config number to download (or press Enter to exit): ").strip()
+                if not selection:
+                    break
+
+                entry_type, data = self.process_selection(selection, ordered_configs)
+                if entry_type == "group":
+                    self.download_config_group(data)
+                elif entry_type == "single":
+                    base_name = data.name.split('-')[0]
+                    self.download_config(data, base_name)
+
+                input("\nPress Enter to continue...")
+                self.clear_screen()
+
+            except KeyboardInterrupt:
+                rprint("\n[yellow]Operation cancelled by user[/yellow]")
+                break
+            except Exception as e:
+                rprint(f"[red]Error: {str(e)}[/red]")
+                input("\nPress Enter to continue...")
+                self.clear_screen()

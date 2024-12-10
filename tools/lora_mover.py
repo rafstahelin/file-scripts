@@ -12,12 +12,14 @@ from rich.columns import Columns
 from rich import print as rprint
 from rich.prompt import Prompt
 from .base_tool import BaseTool
+from .metadata_handler import MetadataHandler
 
 class LoRaMover:
     def __init__(self):
         self.console = Console()
         self.base_path = Path.cwd()
-        self.destination_base = Path('/workspace/StableSwarmUI/Models/Lora/flux')
+        self.destination_base = Path('/workspace/StableSwarmUI/Models/loras/flux')
+        self.metadata_handler = MetadataHandler()
 
     def clear_screen(self):
         """Clear terminal screen."""
@@ -223,16 +225,19 @@ class LoRaMover:
         """Process and copy safetensors files with proper naming."""
         try:
             processed_count = 0
+            
+            # Get metadata once for all checkpoints
+            metadata = self.metadata_handler.create_metadata(model_name, version)
+            if metadata:
+                self.console.print("[cyan]Extracted training configuration[/cyan]")
+            
             checkpoints = [d for d in source_path.iterdir() if d.is_dir() 
                           and d.name.startswith('checkpoint-')]
             
             for checkpoint_dir in checkpoints:
-                # Extract step count from checkpoint directory name
                 step_count = checkpoint_dir.name.split('-')[1]
-                # Changed to 5 digits padding
-                step_count = str(int(step_count)).zfill(5)  # Now creates 00600 instead of 0600
+                step_count = str(int(step_count)).zfill(5)
                 
-                # Source and destination files
                 source_file = checkpoint_dir / "pytorch_lora_weights.safetensors"
                 if source_file.exists():
                     new_filename = f"{model_name}-{version}-{step_count}.safetensors"
@@ -240,6 +245,12 @@ class LoRaMover:
                     
                     # Create destination directory if it doesn't exist
                     dest_file.parent.mkdir(parents=True, exist_ok=True)
+                    
+                    # Update metadata if available
+                    if metadata:
+                        self.console.print(f"[cyan]Updating metadata for checkpoint {step_count}...[/cyan]")
+                        if not self.metadata_handler.update_safetensors_metadata(source_file, metadata):
+                            self.console.print("[yellow]Warning: Failed to update metadata[/yellow]")
                     
                     # Copy the file
                     shutil.copy2(source_file, dest_file)
@@ -345,40 +356,40 @@ class LoRaMover:
             rprint("[yellow]No files were processed[/yellow]")
 
     def run(self):
-        """Main execution method."""
-        self.clear_screen()
-        
-        # Verify paths before proceeding
-        if not self.verify_paths():
-            return
+            """Main execution method."""
+            self.clear_screen()
             
-        rprint("[magenta]=== LoRA Model Management Tool ===[/magenta]")
-        
-        rprint("\n[cyan]Select processing mode:[/cyan]")
-        rprint("[yellow]1. Process single version[/yellow]")
-        rprint("[yellow]2. Process all versions of a model[/yellow]")
-        
-        choice = Prompt.ask("\nEnter choice").strip()
-        if not choice:
-            rprint("[red]Exited--no input given[/red]")
-            return
-        
-        if choice == "1":
-            self.process_single_version()
-        elif choice == "2":
-            self.process_all_versions()
-        else:
-            rprint("[red]Invalid choice[/red]")
-            return
+            # Verify paths before proceeding
+            if not self.verify_paths():
+                return
+                
+            rprint("[magenta]=== LoRA Model Management Tool ===[/magenta]")
+            
+            rprint("\n[cyan]Select processing mode:[/cyan]")
+            rprint("[yellow]1. Process single version[/yellow]")
+            rprint("[yellow]2. Process all versions of a model[/yellow]")
+            
+            choice = Prompt.ask("\nEnter choice").strip()
+            if not choice:
+                rprint("[red]Exited--no input given[/red]")
+                return
+            
+            if choice == "1":
+                self.process_single_version()
+            elif choice == "2":
+                self.process_all_versions()
+            else:
+                rprint("[red]Invalid choice[/red]")
+                return
+
 
 class Tool(BaseTool):
     def __init__(self):
         super().__init__()
         self.tool_name = "LoRA Model Management Tool"
         self.mover = LoRaMover()
-        # Update paths to use workspace_path
         self.mover.base_path = self.workspace_path / 'SimpleTuner/output'
-        self.mover.destination_base = self.workspace_path / 'StableSwarmUI/Models/Lora/flux'
+        self.mover.destination_base = self.workspace_path / 'StableSwarmUI/Models/loras/flux'
         
     def process(self):
         """Main process implementation."""
@@ -407,6 +418,7 @@ class Tool(BaseTool):
         else:
             rprint("[red]Invalid choice[/red]")
             time.sleep(1)
+
 
 if __name__ == "__main__":
     tool = Tool()

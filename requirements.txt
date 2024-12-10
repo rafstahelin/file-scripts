@@ -1,2 +1,0 @@
-rich
-python-dotenv

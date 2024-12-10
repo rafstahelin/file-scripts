@@ -110,22 +110,10 @@ class Tool(BaseTool):
         """Remove cache directories for a specific token-dataset pair."""
         try:
             # Display what will be removed
-            rprint(f"\n[cyan]Will remove the following cache directories for {token}-{dataset}:[/cyan]")
+            rprint(f"\n[cyan]Removing cache directories for {token}-{dataset}:[/cyan]")
             for cache_type, path in cache_paths.items():
                 rprint(f"[yellow]- {cache_type}: {path}[/yellow]")
-            
-            # Confirm deletion unless skipped
-            if not skip_confirm:
-                confirm = Prompt.ask(
-                    "\nAre you sure you want to delete these cache directories? This cannot be undone",
-                    choices=["y", "n"],
-                    default="n"
-                )
                 
-                if confirm.lower() != 'y':
-                    rprint("[yellow]Operation cancelled[/yellow]")
-                    return False
-            
             with Progress(
                 TextColumn("[bold blue]{task.description}"),
                 BarColumn(complete_style="green"),
@@ -150,7 +138,7 @@ class Tool(BaseTool):
                 if not skip_confirm:
                     rprint("[yellow]No cache directories were removed[/yellow]")
                 return False
-                
+                    
         except Exception as e:
             rprint(f"[red]Error removing cache directories: {str(e)}[/red]")
             return False
@@ -201,37 +189,30 @@ class Tool(BaseTool):
             rprint(f"[red]Error removing cache group: {str(e)}[/red]")
             return False
 
-Updated menu text for remove_dataset_cache.py
-
-def process(self):
-    """Main process implementation."""
-    self.clear_screen()
-    
-    if not self.verify_paths():
-        self.exit_tool()
-        return
+    def process(self):
+        """Main process implementation."""
+        self.clear_screen()
         
-    rprint("[magenta]=== Dataset Cache Removal Tool ===[/magenta]")
-    rprint("[cyan]Press Enter to return to main menu[/cyan]")
-    rprint("[cyan]Use group name + all to delete whole group (e.g. 'lulu15 all')[/cyan]")
-    
-    # List and select cache directories
-    rprint("\n[cyan]Available Cache Directories:[/cyan]")
-    cache_items, token_groups = self.list_cache_directories()
-    if not cache_items:
-        self.exit_tool()
-        return
-        
-    cache_input = Prompt.ask("\nEnter number or group command").strip()
-    if not cache_input:
-        self.exit_tool()
-        return
+        if not self.verify_paths():
+            self.exit_tool()
+            return
             
-        cache_input = Prompt.ask("\nEnter number to select cache").strip()
+        rprint("[magenta]=== Dataset Cache Removal Tool ===[/magenta]")
+        rprint("[cyan]Press Enter to return to main menu[/cyan]")
+        rprint("[cyan]Use group name + all to delete whole group (e.g. 'lulu15 all')[/cyan]")
+        
+        # List and select cache directories
+        rprint("\n[cyan]Available Cache Directories:[/cyan]")
+        cache_items, token_groups = self.list_cache_directories()
+        if not cache_items:
+            self.exit_tool()
+            return
+            
+        cache_input = Prompt.ask("\nEnter number or group command").strip()
         if not cache_input:
             self.exit_tool()
             return
-        
+            
         # Check for group removal command
         if cache_input.lower().endswith(" all"):
             token_name = cache_input[:-4].strip()

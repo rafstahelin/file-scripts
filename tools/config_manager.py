@@ -87,44 +87,48 @@ class ConfigManager:
                 print(f"{prompt_text} [y/n]: ", end='', flush=True)
 
     def list_folders(self) -> list:
-        """List all configuration folders."""
-        folders = [f for f in self.root_path.iterdir() 
-                  if f.is_dir() and f.name not in ['templates', '.ipynb_checkpoints']]
-        
-        # Group folders by base name
-        grouped = {}
-        ordered_folders = []
-        for folder in folders:
-            base_name = folder.name.split('-', 1)[0]
-            grouped.setdefault(base_name, []).append(folder.name)
-            ordered_folders.append(folder.name)
+            """List all configuration folders."""
+            folders = [f for f in self.root_path.iterdir() 
+                      if f.is_dir() and f.name not in ['templates', '.ipynb_checkpoints']]
             
-        # Create panels for each group
-        panels = []
-        index = 1
-        
-        for base_name in sorted(grouped.keys()):
-            table = Table(show_header=False, show_edge=False, box=None, padding=(0,1))
-            table.add_column(justify="left", no_wrap=False, overflow='fold', max_width=30)
+            # Group folders by base name
+            grouped = {}
+            ordered_folders = []  # This will store folders in display order
             
-            names_in_group = sorted(grouped[base_name], key=str.lower, reverse=True)
-            for name in names_in_group:
-                table.add_row(f"[yellow]{index}. {name}[/yellow]")
-                index += 1
+            # First, group the folders
+            for folder in folders:
+                base_name = folder.name.split('-', 1)[0]
+                grouped.setdefault(base_name, []).append(folder.name)
+            
+            # Create panels and build ordered list simultaneously
+            panels = []
+            index = 1
+            
+            # Process groups in sorted order
+            for base_name in sorted(grouped.keys()):
+                table = Table(show_header=False, show_edge=False, box=None, padding=(0,1))
+                table.add_column(justify="left", no_wrap=False, overflow='fold', max_width=30)
                 
-            panel = Panel(table, title=f"[magenta]{base_name}[/magenta]", 
-                         border_style="blue", width=36)
-            panels.append(panel)
+                # Sort names within group and add to ordered_folders
+                names_in_group = sorted(grouped[base_name], key=str.lower, reverse=True)
+                for name in names_in_group:
+                    table.add_row(f"[yellow]{index}. {name}[/yellow]")
+                    ordered_folders.append(name)  # Add to ordered list as we display
+                    index += 1
+                    
+                panel = Panel(table, title=f"[magenta]{base_name}[/magenta]", 
+                             border_style="blue", width=36)
+                panels.append(panel)
             
-        # Arrange panels into rows with three panels each
-        panels_per_row = 3
-        for i in range(0, len(panels), panels_per_row):
-            row_panels = panels[i:i + panels_per_row]
-            while len(row_panels) < panels_per_row:
-                row_panels.append(Panel("", border_style="blue", width=36))
-            self.console.print(Columns(row_panels, equal=True, expand=True))
-            
-        return ordered_folders
+            # Display panels
+            panels_per_row = 3
+            for i in range(0, len(panels), panels_per_row):
+                row_panels = panels[i:i + panels_per_row]
+                while len(row_panels) < panels_per_row:
+                    row_panels.append(Panel("", border_style="blue", width=36))
+                self.console.print(Columns(row_panels, equal=True, expand=True))
+                
+            return ordered_folders
         
     def list_templates(self) -> list:
         """List template folders from the templates directory."""
@@ -182,14 +186,15 @@ class ConfigManager:
         
         # Group datasets by base name
         grouped = {}
-        ordered_datasets = []
+        ordered_datasets = []  # This will store datasets in display order
         index = 1
         
-        for dataset in datasets:
+        # Sort datasets first to maintain consistent order
+        for dataset in sorted(datasets):
             base_name = dataset.split('-', 1)[0]
             grouped.setdefault(base_name, []).append(dataset)
-            ordered_datasets.append(dataset)
-
+            ordered_datasets.append(dataset)  # Add to ordered list as we process
+    
         # Create panels for each group
         panels = []
         for base_name in sorted(grouped.keys()):
@@ -200,11 +205,11 @@ class ConfigManager:
             for name in names_in_group:
                 table.add_row(f"[yellow]{index}. {name}[/yellow]")
                 index += 1
-                
+                    
             panel = Panel(table, title=f"[magenta]{base_name}[/magenta]", 
                          border_style="blue", width=36)
             panels.append(panel)
-
+    
         # Display panels
         panels_per_row = 3
         for i in range(0, len(panels), panels_per_row):
@@ -212,7 +217,7 @@ class ConfigManager:
             while len(row_panels) < panels_per_row:
                 row_panels.append(Panel("", border_style="blue", width=36))
             self.console.print(Columns(row_panels, equal=True, expand=True))
-            
+        
         return ordered_datasets
 
     def parse_folder_name(self, folder: str) -> Tuple[str, str]:
