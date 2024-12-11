@@ -1,25 +1,23 @@
 """
-Set Config Tool
---------------
+Set Config Tool - Enhanced Version
+--------------------------------
 Interactive configuration editor for SimpleTuner training parameters.
-Features discrete updates and immediate parameter selection with improved error handling.
 """
 
-from rich.layout import Layout
-from rich.panel import Panel
-from rich.table import Table
-from rich.console import Console
-from rich.columns import Columns
-from rich.prompt import Prompt
-from pathlib import Path
 import json
-import re
 import os
 import sys
 import termios
 import tty
 from contextlib import contextmanager
-from typing import Dict, Any, Optional
+from pathlib import Path
+from typing import Dict, Any, Optional, List, Tuple, Union
+from rich.console import Console
+from rich.layout import Layout
+from rich.panel import Panel
+from rich.table import Table
+from rich.prompt import Prompt
+from rich.columns import Columns
 
 @contextmanager
 def raw_mode(file):
@@ -36,109 +34,198 @@ def raw_mode(file):
         finally:
             termios.tcsetattr(file.fileno(), termios.TCSADRAIN, old_attrs)
 
-class ConfigEditor:
-    """Handles the interactive configuration editing interface"""
+class ParameterLibrary:
+    def __init__(self):
+        self.base_path = Path(__file__).parent.parent
+        self.library_path = self.base_path / 'config' / 'set_config_lib.json'
+        self.parameters: Dict[str, Dict] = {}
+        self.load_parameter_library()
     
+    def load_parameter_library(self) -> None:
+        try:
+            if not self.library_path.exists():
+                raise FileNotFoundError(f"Parameter library not found: {self.library_path}")
+                
+            with open(self.library_path) as f:
+                raw_data = json.load(f)
+                if not isinstance(raw_data, dict):
+                    raise ValueError("Invalid parameter library format")
+                self.parameters = raw_data
+        except Exception as e:
+            raise RuntimeError(f"Failed to load parameter library: {str(e)}")
+    
+    def get_parameter_definition(self, param_key: str) -> Dict:
+        key = param_key.lstrip('-')
+        for category, params in self.parameters.items():
+            if key in params:
+                return params[key]
+            if f"--{key}" in params:
+                return params[f"--{key}"]
+        raise KeyError(f"Parameter not found in library: {param_key}")
+
+class ParameterSelector:
+    def __init__(self):
+        self.base_path = Path(__file__).parent.parent
+        self.selection_path = self.base_path / 'config' / 'set_config_params.txt'
+        self.selected_params: List[str] = []
+        self.load_parameter_selection()
+    
+    def load_parameter_selection(self) -> None:
+        try:
+            if not self.selection_path.exists():
+                raise FileNotFoundError(f"Parameter selection file not found: {self.selection_path}")
+            with open(self.selection_path) as f:
+                self.selected_params = [line.strip() for line in f if line.strip()]
+        except Exception as e:
+            raise RuntimeError(f"Failed to load parameter selection: {str(e)}")
+
+class ConfigEditor:
     def __init__(self):
         self.console = Console()
-        self.parameters = {
-            "1": {
-                "name": "Learning Rate",
-                "value": "1e-4",
-                "type": "float",
-                "description": "Initial learning rate for training"
-            },
-            "2": {
-                "name": "Optimizer",
-                "value": "adamw_bf16",
-                "type": "choice",
-                "options": ["adamw_bf16", "optimi-lion", "optimi-stableadamw"],
-                "description": "Optimization algorithm for training"
-            },
-            "3": {
-                "name": "LR Scheduler",
-                "value": "constant",
-                "type": "choice",
-                "options": ["constant", "constant_with_warmup", "cosine", "polynomial"],
-                "description": "Learning rate adjustment strategy"
-            },
-            "4": {
-                "name": "LoRA Rank",
-                "value": "32",
-                "type": "int",
-                "description": "Dimension of LoRA update matrices"
-            },
-            "5": {
-                "name": "Train Batch Size",
-                "value": "1",
-                "type": "int",
-                "description": "Number of samples per training batch"
-            },
-            "6": {
-                "name": "Max Train Steps",
-                "value": "1500",
-                "type": "int",
-                "description": "Maximum number of training steps"
-            }
-        }
+        self.library = ParameterLibrary()
+        self.selector = ParameterSelector()
+        self.parameters: Dict[str, Dict] = {}
         self.current_config: Optional[str] = None
         self.current_parameter: Optional[str] = None
         self.status_message: str = ""
+        self.initialize_parameters()
+    
+    def initialize_parameters(self) -> None:
+        for idx, param_key in enumerate(self.selector.selected_params, 1):
+            try:
+                param_def = self.library.get_parameter_definition(param_key)
+                is_choice, param_type = self.determine_parameter_type(param_def)
+                
+                self.parameters[str(idx)] = {
+                    "name": param_key,
+                    "value": "",
+                    "is_choice": is_choice or param_type == 'bool',  # Boolean parameters are always choice
+                    "type": param_type,
+                    "options": self.get_parameter_options(param_def, param_type),
+                    "config_key": f"--{param_key}" if not param_key.startswith('--') else param_key
+                }
+            except KeyError as e:
+                self.console.print(f"[yellow]Warning: {str(e)}[/yellow]")
+    
+    def determine_parameter_type(self, param_def: Dict) -> Tuple[bool, str]:
+        """Enhanced type detection with special handling for booleans"""
+        if isinstance(param_def, dict):
+            if any(isinstance(x, bool) for x in param_def.values()):
+                return True, 'bool'
+            elif any(isinstance(x, float) for x in param_def.values()):
+                return False, 'float'
+            elif any(isinstance(x, int) for x in param_def.values()):
+                return False, 'int'
+            return False, 'string'
+        elif isinstance(param_def, list):
+            if all(isinstance(x, bool) for x in param_def):
+                return True, 'bool'
+            elif all(isinstance(x, (int, float)) for x in param_def):
+                return False, 'float' if any(isinstance(x, float) for x in param_def) else 'int'
+            return True, 'choice'
+        return False, 'string'
+    
+    def get_parameter_options(self, param_def: Union[Dict, List], param_type: str) -> List:
+        """Get parameter options with special handling for booleans"""
+        if param_type == 'bool':
+            return ['true', 'false']
+        if isinstance(param_def, list):
+            return param_def
+        return []
+    
+    def parse_number_format(self, value: str) -> str:
+        """Enhanced number parsing"""
+        try:
+            value = value.strip().lower()
+            
+            # Split notation (e.g. "1.5 4" -> "1.5e-4")
+            parts = value.split()
+            if len(parts) == 2:
+                try:
+                    base = float(parts[0])
+                    exp = int(parts[1])
+                    return f"{base}e-{exp}"
+                except ValueError:
+                    raise ValueError("Invalid scientific notation format")
+            
+            # Handle decimal or scientific notation
+            try:
+                float(value)  # Validate format
+                return value
+            except ValueError:
+                raise ValueError("Invalid number format")
+                
+        except ValueError as e:
+            raise ValueError(str(e))
 
     def make_parameters_panel(self) -> Panel:
-        """Create the top panel showing current parameter values"""
-        table = Table(show_header=False, box=None, padding=(0, 2))
-        table.add_column("Parameter", style="cyan", width=30)
-        table.add_column("Value", style="white", width=20)
-        table.add_column("Description", style="dim white", width=40)
-        
-        for param_id, param in self.parameters.items():
-            table.add_row(
-                f"[yellow]{param_id}[/yellow] {param['name']}",
-                param['value'],
-                param['description']
+            """Create parameter display panel with two columns"""
+            table = Table(show_header=False, box=None, padding=(0, 2))
+            table.add_column("Parameter", style="cyan", width=30)
+            table.add_column("Value", style="white", width=20)
+            
+            params = list(self.parameters.items())
+            mid_point = (len(params) + 1) // 2
+            
+            for i in range(max(len(params[:mid_point]), len(params[mid_point:]))):
+                left = params[i] if i < mid_point else None
+                right = params[i + mid_point] if i + mid_point < len(params) else None
+                
+                if left and right:
+                    table.add_row(
+                        f"[yellow]{left[0]}[/yellow] [cyan]{left[1]['name']}[/cyan]", 
+                        str(left[1]['value']) if left[1]['value'] else "",
+                        f"[yellow]{right[0]}[/yellow] [cyan]{right[1]['name']}[/cyan]", 
+                        str(right[1]['value']) if right[1]['value'] else ""
+                    )
+                elif left:
+                    table.add_row(
+                        f"[yellow]{left[0]}[/yellow] [cyan]{left[1]['name']}[/cyan]", 
+                        str(left[1]['value']) if left[1]['value'] else "",
+                        "", ""
+                    )
+            
+            return Panel(
+                table,
+                title=f"[gold1]Parameter Settings - {self.current_config}[/gold1]",
+                border_style="blue",
+                padding=(1, 1)
             )
 
+    def make_options_panel(self) -> Panel:
+        """Create parameter options panel with improved display logic"""
+        content = ""
+        
+        if not self.current_parameter:
+            content = "Select parameter to edit:"
+        else:
+            param = self.parameters[self.current_parameter]
+            if param['is_choice']:
+                options = [f"[yellow]{i}[/yellow] {option}" 
+                          for i, option in enumerate(param['options'], 1)]
+                content = "\n".join([
+                    f"Select value for {param['name']}:",
+                    *options
+                ])
+            else:
+                type_hints = {
+                    'float': "Enter number (format: 1.5e-4 or 1.5 4)",
+                    'int': "Enter whole number",
+                    'bool': "Enter true or false",
+                    'string': "Enter value"
+                }
+                content = f"Enter value for {param['name']}:"
+                if param['type'] in type_hints:
+                    content += f"\n{type_hints[param['type']]}"
+        
         return Panel(
-            table,
-            title=f"[gold1]Parameter Settings - {self.current_config}[/gold1]",
+            content,
+            title="[gold1]Parameter Options[/gold1]",
             border_style="blue",
             padding=(1, 1)
         )
 
-    def make_options_panel(self) -> Panel:
-        """Create the options panel with parameter editing interface"""
-        if not self.current_parameter:
-            content = "\n".join([
-                "Select parameter to edit (press number key):",
-                *(f"[yellow]{k}[/yellow] {v['name']}" for k, v in self.parameters.items()),
-                "",
-                "Press Enter to save and exit"
-            ])
-        else:
-            param = self.parameters[self.current_parameter]
-            if param['type'] == 'choice':
-                options = [f"[yellow]{i}[/yellow] {option}" 
-                          for i, option in enumerate(param['options'], 1)]
-                content = "\n".join([
-                    f"Select {param['name']} option:",
-                    *options
-                ])
-            else:
-                type_hint = ("Enter number in scientific notation"
-                            if param['type'] == 'float' else "Enter a whole number")
-                content = "\n".join([
-                    f"Enter new value for {param['name']}",
-                    f"Current: {param['value']}",
-                    type_hint,
-                    "Press Enter to cancel"
-                ])
-    
-        return Panel(content, title="[gold1]Parameter Options[/gold1]",
-                    border_style="blue", padding=(1, 1))
-
     def update_display(self) -> None:
-        """Update the screen display"""
         os.system('cls' if os.name == 'nt' else 'clear')
         layout = Layout()
         layout.split_column(
@@ -146,116 +233,104 @@ class ConfigEditor:
             Layout(self.make_options_panel())
         )
         self.console.print(layout)
-
-    def get_immediate_char(self) -> str:
-        """Get a single character input immediately"""
-        if os.name == 'nt':
-            import msvcrt
-            return msvcrt.getch().decode('utf-8')
-        else:
-            return sys.stdin.read(1)
-
-    def parse_scientific_notation(self, value: str) -> str:
-        """Parse simplified scientific notation input"""
-        try:
-            parts = value.strip().split()
-            if len(parts) == 1:
-                current_value = self.parameters[self.current_parameter]["value"]
-                if 'e-' in current_value:
-                    current_exp = int(current_value.split('e-')[1])
-                    return f"{float(parts[0])}e-{current_exp}"
-                elif 'e+' in current_value:
-                    current_exp = int(current_value.split('e+')[1])
-                    return f"{float(parts[0])}e+{current_exp}"
-                return value
-            elif len(parts) == 2:
-                first, second = parts
-                return f"{float(first)}e-{int(second)}"
-            return value
-        except:
-            return value
+        if self.status_message:
+            self.console.print(f"[red]{self.status_message}[/red]")
+            self.status_message = ""
 
     def handle_parameter_input(self, value: str, immediate: bool = False) -> bool:
-        """Handle parameter value input with validation"""
+        """Enhanced parameter input handling with better boolean support"""
         if not value:
             return True
             
         param = self.parameters[self.current_parameter]
         
-        if param['type'] == 'choice' and immediate:
-            try:
-                idx = int(value) - 1
-                if 0 <= idx < len(param['options']):
-                    param['value'] = param['options'][idx]
-                    self.current_parameter = None
-                    return True
-            except ValueError:
-                pass
+        try:
+            if param['is_choice']:
+                if immediate:
+                    try:
+                        idx = int(value) - 1
+                        if 0 <= idx < len(param['options']):
+                            param['value'] = str(param['options'][idx])
+                            self.current_parameter = None
+                            self.console.print(f"\nSelected: {param['value']}")  # Show selection
+                            return True
+                    except ValueError:
+                        pass
+                    return False
+                
+                try:
+                    idx = int(value) - 1
+                    if 0 <= idx < len(param['options']):
+                        param['value'] = str(param['options'][idx])
+                        return True
+                except ValueError:
+                    raise ValueError("Invalid option selection")
+            elif param['type'] == 'float':
+                parsed_value = self.parse_number_format(value)
+                param['value'] = parsed_value
+                self.console.print(f"\nEntered: {param['value']}")  # Show input
+            elif param['type'] == 'int':
+                param['value'] = str(int(value))
+                self.console.print(f"\nEntered: {param['value']}")  # Show input
+            else:
+                param['value'] = str(value)
+                self.console.print(f"\nEntered: {param['value']}")  # Show input
+            
+            return True
+            
+        except ValueError as e:
+            self.status_message = str(e)
             return False
-        
-        if param['type'] == 'choice':
-            try:
-                idx = int(value) - 1
-                if 0 <= idx < len(param['options']):
-                    param['value'] = param['options'][idx]
-                    return True
-                self.status_message = f"Please select 1-{len(param['options'])}"
-            except ValueError:
-                self.status_message = "Please enter a valid number"
-        
-        elif param['type'] == 'float':
-            try:
-                value = self.parse_scientific_notation(value)
-                float_val = float(eval(value)) if 'e' in value else float(value)
-                param['value'] = f"{float_val:.1e}"
-                return True
-            except:
-                self.status_message = "Enter number in scientific notation"
-        
-        elif param['type'] == 'int':
-            try:
-                int_val = int(value)
-                param['value'] = str(int_val)
-                return True
-            except ValueError:
-                self.status_message = "Please enter a valid integer"
-        
-        return False
 
     def edit_config(self, config_path: Path) -> None:
-        """Main config editing interface"""
+        """Main configuration editing interface with improved value loading"""
         self.current_config = config_path.parent.name
         
         try:
             with open(config_path, 'r') as f:
                 config = json.load(f)
                 for param in self.parameters.values():
-                    key = param['name'].lower().replace(' ', '_')
-                    if key in config:
-                        if param['type'] == 'float':
-                            param['value'] = f"{float(config[key]):.1e}"
-                        else:
-                            param['value'] = str(config[key])
+                    config_key = param['config_key']
+                    key_without_dashes = config_key.lstrip('-')
+                    
+                    # Try both key formats
+                    value = None
+                    if config_key in config:
+                        value = config[config_key]
+                    elif key_without_dashes in config:
+                        value = config[key_without_dashes]
+                    
+                    if value is not None:
+                        if isinstance(value, bool):
+                            param['value'] = str(value).lower()
+                        elif isinstance(value, float):
+                            if abs(value) < 0.01 or abs(value) >= 1000:
+                                param['value'] = f"{value:.2e}"
+                            else:
+                                param['value'] = str(value)
+                        elif isinstance(value, (int, str)):
+                            param['value'] = str(value)
+                    
         except Exception as e:
             self.console.print(f"[red]Error loading config: {str(e)}[/red]")
             return
 
         self.update_display()
 
-        # Handle parameter editing
         with raw_mode(sys.stdin):
             while True:
                 if not self.current_parameter:
-                    key = self.get_immediate_char()
+                    key = sys.stdin.read(1)
                     if key in ('\r', '\n'):
                         break
                     elif key in self.parameters:
                         self.current_parameter = key
+                        self.console.print(f"\nSelected parameter: {self.parameters[key]['name']}")  # Show selection
                         self.update_display()
                         
-                        if self.parameters[key]['type'] == 'choice':
+                        if self.parameters[key]['is_choice']:
                             while True:
-                                choice = self.get_immediate_char()
+                                choice = sys.stdin.read(1)
                                 if choice in ('\r', '\n'):
                                     self.current_parameter = None
                                     break
@@ -268,32 +343,33 @@ class ConfigEditor:
                         self.current_parameter = None
                         self.update_display()
 
-        # Handle save prompt
         self.console.print("\nSave changes? [y/n]: ", end="")
         save_changes = False
         with raw_mode(sys.stdin):
             while True:
-                key = self.get_immediate_char().lower()
+                key = sys.stdin.read(1).lower()
                 if key in ('y', 'n'):
                     save_changes = key == 'y'
                     self.console.print(key)
                     break
 
-        # Save or discard changes
         if save_changes:
             try:
-                config_data = {}
+                with open(config_path, 'r') as f:
+                    config = json.load(f)
+                
                 for param in self.parameters.values():
-                    key = param['name'].lower().replace(' ', '_')
                     if param['type'] == 'float':
-                        config_data[key] = float(param['value'])
+                        config[param['config_key']] = float(param['value'])
                     elif param['type'] == 'int':
-                        config_data[key] = int(param['value'])
+                        config[param['config_key']] = int(param['value'])
+                    elif param['type'] == 'bool':
+                        config[param['config_key']] = param['value'].lower() == 'true'
                     else:
-                        config_data[key] = param['value']
+                        config[param['config_key']] = param['value']
                 
                 with open(config_path, 'w') as f:
-                    json.dump(config_data, f, indent=4)
+                    json.dump(config, f, indent=4)
                 self.console.print("[green]Config saved successfully![/green]")
             except Exception as e:
                 self.console.print(f"[red]Error saving config: {str(e)}[/red]")
@@ -301,8 +377,6 @@ class ConfigEditor:
             self.console.print("[yellow]Changes discarded.[/yellow]")
 
 class Tool:
-    """Main tool class for managing configuration files"""
-    
     def __init__(self):
         self.console = Console()
         self.panel_width = 40
@@ -310,31 +384,10 @@ class Tool:
         self.editor = ConfigEditor()
 
     def extract_family_name(self, config_path: Path) -> str:
-        """Extract the base family name from config path"""
         base_name = config_path.parent.name
-        family_name = re.match(r'^([a-zA-Z]+)', base_name)
-        return family_name.group(1) if family_name else "other"
-
-    def group_configs_by_family(self, configs: list[Path]) -> Dict[str, list[Path]]:
-        """Group configs by their family name"""
-        families = {}
-        
-        for config in configs:
-            if "templates" in str(config.parent):
-                continue
-                
-            family = self.extract_family_name(config)
-            if family not in families:
-                families[family] = []
-            families[family].append(config)
-            
-        for family in families:
-            families[family].sort(key=lambda x: x.parent.name)
-            
-        return families
+        return base_name.split('-')[0] if '-' in base_name else base_name
 
     def create_family_panel(self, family_name: str, configs: list[Path], start_idx: int) -> Panel:
-        """Create a panel for a config family"""
         content = []
         current_idx = start_idx
         
@@ -342,16 +395,30 @@ class Tool:
             env_name = config.parent.name
             content.append(f"[yellow]{current_idx}.[/yellow] {env_name}")
             current_idx += 1
-            
+        
         return Panel(
             "\n".join(content),
-            title=f"[yellow]{family_name}[/yellow]",
+            title=f"[yellow]{family_name.upper()}[/yellow]",
             border_style="blue",
             width=self.panel_width
         )
 
+    def group_configs_by_family(self, configs: list[Path]) -> Dict[str, list[Path]]:
+        families = {}
+        for config in configs:
+            if "templates" in str(config.parent):
+                continue
+            family = self.extract_family_name(config)
+            if family not in families:
+                families[family] = []
+            families[family].append(config)
+        
+        for family in families:
+            families[family].sort(key=lambda x: x.parent.name)
+        
+        return families
+
     def display_configs(self, configs: list[Path]) -> None:
-        """Display configs grouped by family in panels"""
         families = self.group_configs_by_family(configs)
         current_idx = 1
         panels = []
@@ -369,7 +436,6 @@ class Tool:
             self.console.print(Columns(panels, equal=True, expand=True))
 
     def run(self) -> None:
-        """Main execution method"""
         if not self.base_path.exists():
             self.console.print(f"[red]Error: Directory not found: {self.base_path}[/red]")
             return
@@ -381,18 +447,19 @@ class Tool:
             self.console.print("[red]No config files found[/red]")
             return
 
+        self.console.print("[cyan]Loading config editor...[/cyan]\n")
         self.display_configs(configs)
         
         while True:
             selection = Prompt.ask("\nEnter config number to edit (or Enter to exit)")
             if not selection:
-                return
+                break
                 
             try:
                 idx = int(selection) - 1
                 all_configs = []
                 families = self.group_configs_by_family(configs)
-                for family_name, family_configs in sorted(families.items()):
+                for family_configs in families.values():
                     all_configs.extend(family_configs)
                 
                 if 0 <= idx < len(all_configs):
@@ -400,10 +467,13 @@ class Tool:
                     return
                 self.console.print("[red]Invalid selection[/red]")
             except ValueError:
-                if selection.strip() == '':
-                    return
-                self.console.print("[red]Invalid input[/red]")
+                self.console.print("[red]Please enter a valid number[/red]")
 
 if __name__ == "__main__":
-    tool = Tool()
-    tool.run()
+    try:
+        tool = Tool()
+        tool.run()
+    except Exception as e:
+        print(f"Critical error: {str(e)}")
+        import traceback
+        traceback.print_exc()
