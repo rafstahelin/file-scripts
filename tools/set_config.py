@@ -18,6 +18,7 @@ from rich.panel import Panel
 from rich.table import Table
 from rich.prompt import Prompt
 from rich.columns import Columns
+import time
 
 @contextmanager
 def raw_mode(file):
@@ -394,26 +395,33 @@ class ConfigEditor:
     def handle_rename(self, config_path: Path) -> None:
         """Handle the rename operation"""
         current_name = config_path.parent.name
-        self.console.print(f"\nCurrent name: {current_name}")
-        new_name = self.console.input("Enter new name: ").strip()
+        base_name = current_name.split('-')[0]
+        
+        self.console.print(f"\nCurrent config: {current_name}")
+        self.console.print(f"Base model: {base_name}")
+        
+        new_version = self.console.input("\nDefine new version name: ").strip()
+        new_name = f"{base_name}-{new_version}"
         
         if new_name and new_name != current_name:
             if self.validate_new_name(new_name):
                 try:
                     new_path = config_path.parent.parent / new_name
                     config_path.parent.rename(new_path)
-                    self.console.print(f"[green]Successfully renamed to {new_name}[/green]")
+                    self.console.print(f"[green]Successfully renamed to: {new_name}[/green]")
+                    time.sleep(1)  # Add 1 second pause
                 except Exception as e:
                     self.console.print(f"[red]Error during rename: {str(e)}[/red]")
             else:
                 self.console.print("[red]Invalid name format or name already exists[/red]")
+
 
     def validate_new_name(self, new_name: str) -> bool:
         """Validate the new config name"""
         # Check for invalid characters
         if not all(c.isalnum() or c in '-_' for c in new_name):
             return False
-        
+            
         # Check if name already exists
         new_path = Path(self.current_config).parent.parent / new_name
         if new_path.exists():
@@ -425,6 +433,7 @@ class ConfigEditor:
             return False
             
         return True
+
 
 class Tool:
     def __init__(self):
