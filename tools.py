@@ -56,6 +56,7 @@ class ToolsManager:
             ],
             "Dev Tools": [
                 ('validation_grid', 'Validation Grid', 'OK'),
+                ('dataset_grid', 'Dataset Grid', 'OK'),
                 ('debug_crops', 'Debug Crops', '-')
             ],
             "Cleanup Tools": [
