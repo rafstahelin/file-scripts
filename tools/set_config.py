@@ -184,13 +184,38 @@ class ConfigEditor:
                         str(left[1]['value']) if left[1]['value'] else "",
                         "", ""
                     )
-            
+        
             return Panel(
                 table,
                 title=f"[gold1]Parameter Settings - {self.current_config}[/gold1]",
                 border_style="blue",
                 padding=(1, 1)
             )
+
+    def handle_save_and_rename(self, config_path: Path) -> None:
+        """Handle save confirmation and potential rename"""
+        self.console.print("\nSave changes? (Enter=Yes, Esc=No): ", end="")
+        save_confirmed = False
+        
+        with raw_mode(sys.stdin):
+            key = sys.stdin.read(1)
+            if key == '\r':  # Enter - Save changes
+                self.console.print("Yes")
+                self.save_changes(config_path)
+                save_confirmed = True
+            elif key == '\x1b':  # Escape - Discard changes
+                self.console.print("No")
+                self.console.print("[yellow]Changes discarded.[/yellow]")
+    
+        if save_confirmed:
+            self.console.print("\nRename config? (Space=Yes, Enter=No): ", end="")
+            with raw_mode(sys.stdin):
+                key = sys.stdin.read(1)
+                if key == ' ':  # Space - Do rename
+                    self.console.print("Yes")
+                    self.handle_rename(config_path)
+                elif key == '\r':  # Enter - Skip rename
+                    self.console.print("No")
 
     def make_options_panel(self) -> Panel:
         """Create parameter options panel with improved display logic"""
@@ -238,49 +263,49 @@ class ConfigEditor:
             self.status_message = ""
 
     def handle_parameter_input(self, value: str, immediate: bool = False) -> bool:
-        """Enhanced parameter input handling with better boolean support"""
-        if not value:
-            return True
+            """Enhanced parameter input handling with better boolean support"""
+            if not value:
+                return True
+                
+            param = self.parameters[self.current_parameter]
             
-        param = self.parameters[self.current_parameter]
-        
-        try:
-            if param['is_choice']:
-                if immediate:
+            try:
+                if param['is_choice']:
+                    if immediate:
+                        try:
+                            idx = int(value) - 1
+                            if 0 <= idx < len(param['options']):
+                                param['value'] = str(param['options'][idx])
+                                self.current_parameter = None
+                                self.console.print(f"\nSelected: {param['value']}")
+                                return True
+                        except ValueError:
+                            pass
+                        return False
+                    
                     try:
                         idx = int(value) - 1
                         if 0 <= idx < len(param['options']):
                             param['value'] = str(param['options'][idx])
-                            self.current_parameter = None
-                            self.console.print(f"\nSelected: {param['value']}")  # Show selection
                             return True
                     except ValueError:
-                        pass
-                    return False
+                        raise ValueError("Invalid option selection")
+                elif param['type'] == 'float':
+                    parsed_value = self.parse_number_format(value)
+                    param['value'] = parsed_value
+                    self.console.print(f"\nEntered: {param['value']}")
+                elif param['type'] == 'int':
+                    param['value'] = str(int(value))
+                    self.console.print(f"\nEntered: {param['value']}")
+                else:
+                    param['value'] = str(value)
+                    self.console.print(f"\nEntered: {param['value']}")
                 
-                try:
-                    idx = int(value) - 1
-                    if 0 <= idx < len(param['options']):
-                        param['value'] = str(param['options'][idx])
-                        return True
-                except ValueError:
-                    raise ValueError("Invalid option selection")
-            elif param['type'] == 'float':
-                parsed_value = self.parse_number_format(value)
-                param['value'] = parsed_value
-                self.console.print(f"\nEntered: {param['value']}")  # Show input
-            elif param['type'] == 'int':
-                param['value'] = str(int(value))
-                self.console.print(f"\nEntered: {param['value']}")  # Show input
-            else:
-                param['value'] = str(value)
-                self.console.print(f"\nEntered: {param['value']}")  # Show input
-            
-            return True
-            
-        except ValueError as e:
-            self.status_message = str(e)
-            return False
+                return True
+                
+            except ValueError as e:
+                self.status_message = str(e)
+                return False
 
     def edit_config(self, config_path: Path) -> None:
         """Main configuration editing interface with improved value loading"""
@@ -293,7 +318,6 @@ class ConfigEditor:
                     config_key = param['config_key']
                     key_without_dashes = config_key.lstrip('-')
                     
-                    # Try both key formats
                     value = None
                     if config_key in config:
                         value = config[config_key]
@@ -325,7 +349,7 @@ class ConfigEditor:
                         break
                     elif key in self.parameters:
                         self.current_parameter = key
-                        self.console.print(f"\nSelected parameter: {self.parameters[key]['name']}")  # Show selection
+                        self.console.print(f"\nSelected parameter: {self.parameters[key]['name']}")
                         self.update_display()
                         
                         if self.parameters[key]['is_choice']:
@@ -343,38 +367,64 @@ class ConfigEditor:
                         self.current_parameter = None
                         self.update_display()
 
-        self.console.print("\nSave changes? [y/n]: ", end="")
-        save_changes = False
-        with raw_mode(sys.stdin):
-            while True:
-                key = sys.stdin.read(1).lower()
-                if key in ('y', 'n'):
-                    save_changes = key == 'y'
-                    self.console.print(key)
-                    break
+        self.handle_save_and_rename(config_path)
 
-        if save_changes:
-            try:
-                with open(config_path, 'r') as f:
-                    config = json.load(f)
-                
-                for param in self.parameters.values():
-                    if param['type'] == 'float':
-                        config[param['config_key']] = float(param['value'])
-                    elif param['type'] == 'int':
-                        config[param['config_key']] = int(param['value'])
-                    elif param['type'] == 'bool':
-                        config[param['config_key']] = param['value'].lower() == 'true'
-                    else:
-                        config[param['config_key']] = param['value']
-                
-                with open(config_path, 'w') as f:
-                    json.dump(config, f, indent=4)
-                self.console.print("[green]Config saved successfully![/green]")
-            except Exception as e:
-                self.console.print(f"[red]Error saving config: {str(e)}[/red]")
-        else:
-            self.console.print("[yellow]Changes discarded.[/yellow]")
+    def save_changes(self, config_path: Path) -> None:
+        """Save the current configuration"""
+        try:
+            with open(config_path, 'r') as f:
+                config = json.load(f)
+            
+            for param in self.parameters.values():
+                if param['type'] == 'float':
+                    config[param['config_key']] = float(param['value'])
+                elif param['type'] == 'int':
+                    config[param['config_key']] = int(param['value'])
+                elif param['type'] == 'bool':
+                    config[param['config_key']] = param['value'].lower() == 'true'
+                else:
+                    config[param['config_key']] = param['value']
+            
+            with open(config_path, 'w') as f:
+                json.dump(config, f, indent=4)
+            self.console.print("[green]Config saved successfully![/green]")
+        except Exception as e:
+            self.console.print(f"[red]Error saving config: {str(e)}[/red]")
+
+    def handle_rename(self, config_path: Path) -> None:
+        """Handle the rename operation"""
+        current_name = config_path.parent.name
+        self.console.print(f"\nCurrent name: {current_name}")
+        new_name = self.console.input("Enter new name: ").strip()
+        
+        if new_name and new_name != current_name:
+            if self.validate_new_name(new_name):
+                try:
+                    new_path = config_path.parent.parent / new_name
+                    config_path.parent.rename(new_path)
+                    self.console.print(f"[green]Successfully renamed to {new_name}[/green]")
+                except Exception as e:
+                    self.console.print(f"[red]Error during rename: {str(e)}[/red]")
+            else:
+                self.console.print("[red]Invalid name format or name already exists[/red]")
+
+    def validate_new_name(self, new_name: str) -> bool:
+        """Validate the new config name"""
+        # Check for invalid characters
+        if not all(c.isalnum() or c in '-_' for c in new_name):
+            return False
+        
+        # Check if name already exists
+        new_path = Path(self.current_config).parent.parent / new_name
+        if new_path.exists():
+            return False
+            
+        # Validate family-version pattern (e.g., "family-001")
+        parts = new_name.split('-')
+        if len(parts) != 2:
+            return False
+            
+        return True
 
 class Tool:
     def __init__(self):
@@ -450,24 +500,26 @@ class Tool:
         self.console.print("[cyan]Loading config editor...[/cyan]\n")
         self.display_configs(configs)
         
-        while True:
-            selection = Prompt.ask("\nEnter config number to edit (or Enter to exit)")
-            if not selection:
-                break
-                
-            try:
-                idx = int(selection) - 1
-                all_configs = []
-                families = self.group_configs_by_family(configs)
-                for family_configs in families.values():
-                    all_configs.extend(family_configs)
-                
-                if 0 <= idx < len(all_configs):
-                    self.editor.edit_config(all_configs[idx])
-                    return
-                self.console.print("[red]Invalid selection[/red]")
-            except ValueError:
-                self.console.print("[red]Please enter a valid number[/red]")
+        with raw_mode(sys.stdin):
+            while True:
+                key = sys.stdin.read(1)
+                if not key or key == '\x1b':  # Empty or Escape
+                    break
+                    
+                if key.isdigit():
+                    try:
+                        idx = int(key) - 1
+                        all_configs = []
+                        families = self.group_configs_by_family(configs)
+                        for family_configs in families.values():
+                            all_configs.extend(family_configs)
+                        
+                        if 0 <= idx < len(all_configs):
+                            self.editor.edit_config(all_configs[idx])
+                            return
+                    except ValueError:
+                        self.console.print("[red]Invalid selection[/red]")
+
 
 if __name__ == "__main__":
     try:
