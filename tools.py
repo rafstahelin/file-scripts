@@ -57,6 +57,7 @@ class ToolsManager:
             "Dev Tools": [
                 ('validation_grid', 'Validation Grid', 'OK'),
                 ('dataset_grid', 'Dataset Grid', 'OK'),
+                ('dataset_captions', 'Dataset Captions', 'in dev'),
                 ('debug_crops', 'Debug Crops', '-')
             ],
             "Cleanup Tools": [
@@ -221,31 +222,56 @@ class ToolsManager:
         self.clear_screen()
         if not self.verify_paths():
             return
-            
+    
         while True:
             try:
                 self.clear_screen()
                 self.display_menu()
+                
                 with raw_mode(sys.stdin):
+                    buffer = ""
+                    last_key_time = None
+                    
                     while True:
-                        key = sys.stdin.read(1)
-                        if not key or key == '\x1b':  # Empty or Escape
-                            self.console.print("\n[yellow]Exiting File Management Tools...[/yellow]")
-                            return
-                        if key == '\r' or key == '\n':  # Add Enter key detection
-                            self.console.print("\n[yellow]Exiting File Management Tools...[/yellow]")
-                            return
-                        if key.isdigit():
-                            tool_name = self.get_tool_by_input(key)
+                        import select
+                        import time
+                        
+                        # Check for input with timeout
+                        if select.select([sys.stdin], [], [], 1.0)[0]:  # 1 second timeout
+                            key = sys.stdin.read(1)
+                            
+                            if not key or key == '\x1b':  # Empty or Escape
+                                self.console.print("\n[yellow]Exiting File Management Tools...[/yellow]")
+                                return
+                                
+                            if key == '\r' or key == '\n':  # Enter
+                                if buffer:  # Process accumulated input
+                                    tool_name = self.get_tool_by_input(buffer)
+                                    if tool_name:
+                                        self.clear_screen()
+                                        self.run_tool(tool_name)
+                                        break
+                                else:  # Empty Enter
+                                    self.console.print("\n[yellow]Exiting File Management Tools...[/yellow]")
+                                    return
+                                    
+                            if key.isdigit():
+                                buffer += key
+                                last_key_time = time.time()
+                        
+                        # Check if timeout elapsed since last keypress
+                        elif buffer and last_key_time and (time.time() - last_key_time) > 0.3:
+                            tool_name = self.get_tool_by_input(buffer)
                             if tool_name:
                                 self.clear_screen()
                                 self.run_tool(tool_name)
                                 break
+                            buffer = ""  # Reset buffer if invalid selection
+                            
             except Exception as e:
                 self.console.print(f"[red]Unexpected error: {str(e)}[/red]")
                 self.console.print(traceback.format_exc())
                 input("\nPress Enter to continue...")
-
 
 if __name__ == "__main__":
     try:
