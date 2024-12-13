@@ -1,0 +1,9 @@
+model_type
+flux_lora_target
+learning_rate
+train_batch_size
+webhook_config
+lora_rank
+use_ema
+ema_decay
+ema_update_interval

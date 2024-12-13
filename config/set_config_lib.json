@@ -1,0 +1,99 @@
+{
+    "paths_and_configs": {
+        "--instance_prompt": null,
+        "--user_prompt_library": null,
+        "--data_backend_config": null,
+        "--output_dir": null,
+        "--webhook_config": ["webhooks/webhook-1.json", "webhooks/webhook-2.json", "webhooks/webhook-3.json", "webhooks/webhook-4.json"]
+    },
+
+    "model_settings": {
+        "--model_family": ["flux", "pixart_sigma", "kolors", "sd3", "smoldit", "sdxl", "legacy"],
+        "--model_type": ["lora", "full"],
+        "--flux_lora_target": ["mmdit", "context", "context+ffs", "all", "all+ffs", "ai-toolkit", "tiny", "nano"],
+        "--lora_init_type": ["default", "gaussian", "loftq", "olora", "pissa"],
+        "--lora_rank": [4, 8, 16, 32, 64],
+        "--flux_guidance_value": [1.0, 3.5, 7.5]
+    },
+
+    "training_parameters": {
+        "--train_batch_size": [1, 2, 4, 8],
+        "--max_train_steps": [1000, 2000, 5000],
+        "--num_train_epochs": [0, 5, 10, 20],
+        "--gradient_accumulation_steps": [1, 2, 4, 8],
+        "--learning_rate": [1e-5, 1e-4, 2e-4],
+        "--lr_scheduler": ["constant", "constant_with_warmup", "cosine", "cosine_with_restarts", "polynomial", "linear"],
+        "--lr_warmup_steps": [0, 20, 50, 100],
+        "--max_grad_norm": [0.1, 1.0],
+        "--snr_gamma": [0, 5, 10],
+        "--caption_dropout_probability": [0.0, 0.001, 0.01, 0.1]
+    },
+
+    "optimizer_settings": {
+        "--optimizer": ["adamw_bf16", "adamw_schedulefree", "optimi-stableadamw", "optimi-lion"],
+        "--adam_weight_decay": [0.01, 0.1],
+        "--gradient_checkpointing": [true, false]
+    },
+
+    "precision_settings": {
+        "--mixed_precision": ["bf16", "no"],
+        "--base_model_default_dtype": ["bf16", "fp32"],
+        "--allow_tf32": [true, false],
+        "--enable_xformers_memory_efficient_attention": [true, false]
+    },
+
+    "validation_settings": {
+        "--validation_steps": [100, 125, 200, 500],
+        "--validation_num_inference_steps": [20, 30, 50],
+        "--validation_resolution": ["512x512", "1024x1024", "1024x1280"],
+        "--validation_guidance": [3.5, 7.5],
+        "--validation_guidance_real": [1.0],
+        "--validation_guidance_rescale": [0.0],
+        "--validation_negative_prompt": ["blurry, cropped, ugly"],
+        "--validation_no_cfg_until_timestep": [2],
+        "--validation_seed": [777],
+        "--validation_torch_compile": [true, false],
+        "--disable_benchmark": [true, false]
+    },
+
+    "checkpointing": {
+        "--checkpointing_steps": [100, 200, 500],
+        "--checkpoints_total_limit": [5, 10],
+        "--resume_from_checkpoint": ["latest"],
+        "--push_to_hub": [false],
+        "--push_checkpoints_to_hub": [false]
+    },
+
+    "data_processing": {
+        "--resolution_type": ["pixel", "area", "pixel_area"],
+        "--aspect_bucket_rounding": [1, 2, 3, 4],
+        "--vae_batch_size": [1, 2, 4, 8],
+        "--max_workers": [8, 16, 32],
+        "--read_batch_size": [16, 25, 32],
+        "--write_batch_size": [32, 64],
+        "--image_processing_batch_size": [16, 32],
+        "--compress_disk_cache": [true, false]
+    },
+
+    "system_settings": {
+        "--aws_max_pool_connections": [64, 128],
+        "--torch_num_threads": [4, 8, 16],
+        "--metadata_update_interval": [60, 65, 120],
+        "--seed": [8847392],
+        "--training_scheduler_timestep_spacing": ["leading", "linspace", "trailing"],
+        "--inference_scheduler_timestep_spacing": ["leading", "linspace", "trailing"]
+    },
+
+    "ema_settings": {
+        "--use_ema": [true, false],
+        "--ema_decay": [0.999, 0.9999],
+        "--ema_update_interval": [1, 10, 100],
+        "--ema_device": ["cpu", "accelerator"],
+        "--ema_cpu_only": [true, false],
+        "--ema_foreach_disable": [true, false]
+    },
+
+    "logging_settings": {
+        "--report_to": ["tensorboard", "wandb", "comet_ml"]
+    }
+}
