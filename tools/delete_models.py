@@ -22,11 +22,11 @@ class Tool:
     Delete Models Tool
     -----------------
     Manages deletion of model directories in SimpleTuner output path.
-    Version: 0.7.0
     """
     
+    handles_own_exit = True
+    
     def __init__(self):
-        self.version = "0.7.0"
         self.console = Console()
         self.base_path = Path('/workspace/SimpleTuner/output')
         
@@ -47,15 +47,6 @@ class Tool:
             finally:
                 termios.tcsetattr(fd, termios.TCSADRAIN, old_settings)
             return ch
-
-    def wait_key(self) -> bool:
-        """Wait for Enter or Escape key."""
-        while True:
-            key = self.getch()
-            if key in ['\r', '\n']:  # Enter key
-                return True
-            elif key == '\x1b':  # Escape key
-                return False
 
     def verify_paths(self) -> bool:
         """Verify that required paths exist."""
@@ -138,13 +129,8 @@ class Tool:
             # Count items to delete for progress bar
             total_items = sum(1 for _ in target_path.rglob('*')) + 1
             
-            # Confirm deletion
-            self.console.print(f"\n[cyan]Preparing to delete:[/cyan] [yellow]{target_path.relative_to(self.base_path)}[/yellow]")
-            self.console.print("\nPress [white]ENTER[/white] to delete, ESCAPE for cancel")
-            
-            if not self.wait_key():
-                self.console.print("[yellow]Operation cancelled[/yellow]")
-                return False
+            # Show what we're about to delete
+            self.console.print(f"\n[cyan]Deleting:[/cyan] [yellow]{target_path.relative_to(self.base_path)}[/yellow]")
             
             # Delete with progress bar
             with Progress(
@@ -155,8 +141,6 @@ class Tool:
                 transient=True
             ) as progress:
                 task = progress.add_task(f"Deleting {target_path.name}...", total=total_items)
-                
-                # Delete directory contents
                 shutil.rmtree(target_path, onerror=lambda f, p, e: progress.advance(task))
                 
             self.console.print(f"[green]Successfully deleted {target_path.relative_to(self.base_path)}![/green]")
@@ -168,12 +152,10 @@ class Tool:
 
     def run(self):
         """Main execution method."""
-        self.clear_screen()
-        
         if not self.verify_paths():
             return
             
-        self.console.print(f"[magenta]=== Model Deletion Tool v{self.version} ===[/magenta]\n")
+        self.console.print("[cyan]Loading tool: delete_models[/cyan]\n")
         
         while True:
             # List and display models
@@ -184,27 +166,27 @@ class Tool:
                 return
                 
             # Get user selection
-            self.console.print("\n[yellow]Press MODEL/VERSION # to Select Deletion:[/yellow]")
+            self.console.print("\n[yellow]Select model(s) to delete:[/yellow]")
             selection = input().strip()
             
+            # Handle empty input to exit
+            if not selection:
+                return
+                
             try:
                 index = int(selection) - 1
                 if 0 <= index < len(model_map):
                     family, version = model_map[index]
-                    self.delete_model(family, version)
-                    
-                    # Check if there are more models to delete
-                    self.console.print("\n[yellow]Delete more Models?[/yellow] [white][enter/escape][/white]")
-                    
-                    if not self.wait_key():
-                        break
-                    
-                    # Refresh display
-                    self.clear_screen()
-                    self.console.print(f"[magenta]=== Model Deletion Tool v{self.version} ===[/magenta]\n")
+                    if self.delete_model(family, version):
+                        # Clear screen and continue loop to show updated listing
+                        self.clear_screen()
+                        self.console.print("[cyan]Loading tool: delete_models[/cyan]\n")
+                        continue
                 else:
                     self.console.print("[red]Invalid selection[/red]")
             except ValueError:
+                if selection.lower() == 'q':
+                    return
                 self.console.print("[red]Please enter a valid number[/red]")
 
 if __name__ == "__main__":

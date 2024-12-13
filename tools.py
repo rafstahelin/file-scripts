@@ -45,7 +45,7 @@ class ToolsManager:
         self.tool_categories = {
             "Training": [
                 ("train", "train", "OK"),
-                ('set_config', 'Set Config', 'ok'),
+                ('set_config', 'Set Config', 'in dev'),
                 ('set_prompts', 'Set Prompts', '-'),
                 ('config_manager', 'Config Manager', 'OK')
             ],
@@ -172,7 +172,7 @@ class ToolsManager:
     def run_tool(self, tool_name: str) -> None:
         try:
             tool_path = self.tools_path / f"{tool_name}.py"
-            self.console.print(f"[cyan]Loading tool: {tool_name}[/cyan]")
+            # Remove extra printing since tool will handle it
             
             if not tool_path.exists():
                 self.console.print(f"[red]Error: Tool file not found: {tool_path}[/red]")
@@ -192,7 +192,7 @@ class ToolsManager:
         finally:
             if str(self.tools_path.parent) in sys.path:
                 sys.path.remove(str(self.tools_path.parent))
-            input("\nPress Enter to continue...")
+            # Don't wait for input here - let tool handle its own exit
             self.clear_screen()
 
     def verify_paths(self) -> bool:
