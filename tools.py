@@ -1,9 +1,3 @@
-"""
-File Scripts Tools Manager
--------------------------
-Central menu system for managing and running file-scripts tools.
-"""
-
 import os
 import sys
 import traceback
@@ -12,13 +6,14 @@ from typing import List, Dict, Optional, Tuple
 from rich.console import Console
 from rich.table import Table
 from rich.panel import Panel
+from rich.columns import Columns
 from rich import print as rprint
 from rich.prompt import Prompt
 from contextlib import contextmanager
 import termios
 import tty
 
-@contextmanager 
+@contextmanager
 def raw_mode(file):
     """Context manager for handling raw terminal input"""
     if os.name == 'nt':
@@ -40,7 +35,7 @@ class ToolsManager:
         self.workspace_path = Path('/workspace')
         self.tools_path = self.workspace_path / 'file-scripts' / 'tools'
         self.docs_path = self.workspace_path / 'file-scripts' / 'docs'
-
+        
         # Tool categories and their tools
         self.tool_categories = {
             "Training": [
@@ -73,14 +68,14 @@ class ToolsManager:
         }
 
     def get_all_tools(self) -> List[Tuple[str, str, str]]:
-            """Get a flattened list of all tools."""
-            all_tools = []
-            for category in self.tool_categories.values():
-                all_tools.extend(category)
-            return all_tools
+        """Get a flattened list of all tools."""
+        all_tools = []
+        for category in self.tool_categories.values():
+            all_tools.extend(category)
+        return all_tools
 
     def display_shortcuts(self) -> None:
-        """Display shortcuts using the same Panel and Table format."""
+        """Display shortcuts without numbering."""
         shortcuts = [
             ('tools', 'Launch tools menu'),
             ('config', 'Navigate to configs directory'),
@@ -90,71 +85,99 @@ class ToolsManager:
             ('scripts', 'Navigate to scripts directory')
         ]
         
-        table = Table(
-            show_header=False,
-            box=None,
-            show_edge=False,
-            padding=(1, 1),
-            width=55
-        )
-    
+        table = Table(show_header=False, box=None, show_edge=False, padding=(1, 1), width=55)
         table.add_column("Command", style="white", width=15)
         table.add_column("Description", style="white", width=40)
-    
-        for idx, (shortcut, description) in enumerate(shortcuts, 1):
+        
+        for shortcut, description in shortcuts:
             table.add_row(
-                f"[yellow]{idx}.[/yellow] [cyan]{shortcut}[/cyan]",
+                f"[cyan]{shortcut}[/cyan]",
                 description
             )
-    
-        panel = Panel(
-            table,
-            title="[gold1]Shortcuts[/gold1]",
-            border_style="blue",
-            width=60,
-            padding=(1, 1)
-        )
+            
+        panel = Panel(table, title="[gold1]Shortcuts[/gold1]", border_style="blue", width=60, padding=(1, 1))
         self.console.print(panel)
         print()
 
     def display_menu(self) -> None:
-        """Display categorized menu of available tools."""
+        """Display categorized menu of available tools in two columns."""
         print()
         
-        total_idx = 1
-        first_category = True
-        for category_name, tools in self.tool_categories.items():
-            table = Table(
-                show_header=False,
-                box=None,
-                show_edge=False,
-                padding=(1, 1),
-                width=55
-            )
-    
-            table.add_column("Tool", style="white", width=45)
-            table.add_column("Status", style="yellow", width=10)
-    
-            for tool_name, description, status in tools:
-                status_color = "green" if status == "OK" else "red" if status == "-" else "yellow"
-                table.add_row(
-                    f"[yellow]{total_idx}.[/yellow] {description}",
-                    f"[{status_color}]{status}[/{status_color}]"
+        # Split categories into two columns
+        categories = list(self.tool_categories.items())
+        mid_point = (len(categories) + 1) // 2
+        left_categories = categories[:mid_point]
+        right_categories = categories[mid_point:]
+        
+        # Calculate total tools in left column for numbering
+        left_tools_count = 1
+        for _, tools in left_categories:
+            for _ in tools:
+                left_tools_count += 1
+                
+        # Process columns side by side but number them separately
+        columns = []
+        left_idx = 1
+        right_idx = left_tools_count
+        
+        # Create both panels but maintain separate numbering
+        while left_categories or right_categories:
+            columns = []
+            
+            # Process left column
+            if left_categories:
+                category_name, tools = left_categories.pop(0)
+                left_table = Table(show_header=False, box=None, show_edge=False, padding=(1, 1), width=55)
+                left_table.add_column("Tool", style="white", width=45)
+                left_table.add_column("Status", style="yellow", width=10)
+                
+                for tool_name, description, status in tools:
+                    status_color = "green" if status == "OK" else "red" if status == "-" else "yellow"
+                    left_table.add_row(
+                        f"[yellow]{left_idx}.[/yellow] {description}",
+                        f"[{status_color}]{status}[/{status_color}]"
+                    )
+                    left_idx += 1
+                
+                left_panel = Panel(
+                    left_table,
+                    title=f"[gold1]{category_name}[/gold1]",
+                    border_style="blue",
+                    width=60,
+                    padding=(1, 1)
                 )
-                total_idx += 1
-    
-            panel = Panel(
-                table,
-                title=f"[gold1]{category_name}[/gold1]",
-                border_style="blue",
-                width=60,
-                padding=(1, 1)
-            )
-            self.console.print(panel)
+                columns.append(left_panel)
+            
+            # Process right column
+            if right_categories:
+                category_name, tools = right_categories.pop(0)
+                right_table = Table(show_header=False, box=None, show_edge=False, padding=(1, 1), width=55)
+                right_table.add_column("Tool", style="white", width=45)
+                right_table.add_column("Status", style="yellow", width=10)
+                
+                for tool_name, description, status in tools:
+                    status_color = "green" if status == "OK" else "red" if status == "-" else "yellow"
+                    right_table.add_row(
+                        f"[yellow]{right_idx}.[/yellow] {description}",
+                        f"[{status_color}]{status}[/{status_color}]"
+                    )
+                    right_idx += 1
+                
+                right_panel = Panel(
+                    right_table,
+                    title=f"[gold1]{category_name}[/gold1]",
+                    border_style="blue",
+                    width=60,
+                    padding=(1, 1)
+                )
+                columns.append(right_panel)
+            
+            self.console.print(Columns(columns, equal=True, expand=True))
             print()
-
-        # Display shortcuts at the end
+        
+        # Display shortcuts without numbering
         self.display_shortcuts()
+
 
     def get_tool_by_input(self, user_input: str) -> Optional[str]:
         """Get tool name from user input number."""
