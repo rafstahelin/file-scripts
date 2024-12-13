@@ -46,8 +46,8 @@ class ToolsManager:
             "Training": [
                 ("train", "train", "OK"),
                 ('set_config', 'Set Config', 'in dev'),
-                ('set_prompts', 'Set Prompts', '-'),
-                ('config_manager', 'Config Manager', 'OK')
+                ('set_prompts', 'Set Prompts', 'in dev'),
+                ('config_manager', 'Config Manager', 'in dev')
             ],
             "File Management": [
                 ('lora_mover', 'LoRA Mover', 'OK'),
@@ -57,7 +57,7 @@ class ToolsManager:
             "Dev Tools": [
                 ('validation_grid', 'Validation Grid', 'OK'),
                 ('dataset_grid', 'Dataset Grid', 'OK'),
-                ('dataset_captions', 'Dataset Captions', 'in dev'),
+                ('dataset_captions', 'Dataset Captions', 'OK'),
                 ('debug_crops', 'Debug Crops', '-')
             ],
             "Cleanup Tools": [
