@@ -73,7 +73,8 @@ class ToolsManager:
                 ('remove_checkpoints', 'Remove Checkpoints', 'OK')
             ],
             "Utilities": [
-                ('setup', 'Setup', 'OK')
+                ('setup', 'Setup', 'OK'),
+                ('create_prompt_group', 'Create Prompt Group', 'in dev')
             ]
         }
 
