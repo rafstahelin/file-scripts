@@ -46,11 +46,12 @@ class Tool:
         if not self.all_prompts:
             self.console.print("[red]No prompts found[/red]")
             return
-
+    
         self.console.print("\n[cyan]Available Prompts:[/cyan]")
         
         current_date = None
         current_file = None
+        panel_width = 120
         
         for idx, (name, prompt, source_file, modified_time) in enumerate(self.all_prompts, 1):
             # Format date string
@@ -58,15 +59,20 @@ class Tool:
             
             # If we're starting a new date/file group, print the header
             if date_str != current_date or source_file != current_file:
-                self.console.print(f"\n[dim]{date_str} - {source_file.name}[/dim]")
+                # Get filename without extension
+                file_base = source_file.stem
+                # Right align date with spacing calculation
+                spacing = panel_width - len(file_base) - len(date_str)
+                header = f"[#FFE135]{file_base}[/#FFE135]" + " " * spacing + f"[#00B8B8]{date_str}[/#00B8B8]"
+                self.console.print(f"\n{header}")
                 current_date = date_str
                 current_file = source_file
             
             panel = Panel(
                 prompt,  # Just display the prompt text
-                title=f"[yellow]{idx}.[/yellow] {name}",  # Number and shortname in title
+                title=f"[yellow]{idx}.[/yellow] [#FF1493]{name}[/#FF1493]",  # Number in yellow, shortname in bright pink
                 border_style="blue",
-                width=120
+                width=panel_width
             )
             self.console.print(panel)
 
