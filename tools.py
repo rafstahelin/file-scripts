@@ -28,6 +28,16 @@ def raw_mode(file):
         finally:
             termios.tcsetattr(file.fileno(), termios.TCSADRAIN, old_attrs)
 
+@contextmanager
+def temporary_sys_path(path):
+    """Temporarily add a path to sys.path."""
+    import sys
+    sys.path.insert(0, str(path))  # Add the path to the start of sys.path
+    try:
+        yield
+    finally:
+        sys.path.remove(str(path))  # Ensure the path is removed after use
+
 class ToolsManager:
     def __init__(self):
         self.console = Console()
@@ -193,30 +203,28 @@ class ToolsManager:
         return None
 
     def run_tool(self, tool_name: str) -> None:
+
+        tool_path = self.tools_path / f"{tool_name}.py"
+
+        if not tool_path.exists():
+            self.console.print(f"[red]Error: Tool file not found: {tool_path}[/red]")
+            return
+
         try:
-            tool_path = self.tools_path / f"{tool_name}.py"
-            # Remove extra printing since tool will handle it
-            
-            if not tool_path.exists():
-                self.console.print(f"[red]Error: Tool file not found: {tool_path}[/red]")
-                return
-    
-            if str(self.tools_path.parent) not in sys.path:
-                sys.path.insert(0, str(self.tools_path.parent))
-            
-            try:
+            with temporary_sys_path(self.tools_path.parent):
                 module = __import__(f"tools.{tool_name}", fromlist=['Tool'])
+                if not hasattr(module, 'Tool'):
+                    self.console.print(f"[red]Error: 'Tool' class not found in {tool_name}[/red]")
+                    return
                 tool = module.Tool()
+                if not callable(getattr(tool, 'run', None)):
+                    self.console.print(f"[red]Error: 'run' method not found in Tool class of {tool_name}[/red]")
+                    return
                 tool.run()
-            except Exception as e:
-                self.console.print(f"[red]Error running tool: {str(e)}[/red]")
-                self.console.print("[yellow]Full error trace:[/yellow]")
-                self.console.print(traceback.format_exc())
-        finally:
-            if str(self.tools_path.parent) in sys.path:
-                sys.path.remove(str(self.tools_path.parent))
-            # Don't wait for input here - let tool handle its own exit
-            self.clear_screen()
+
+        except Exception as e:
+            self.console.print(f"[red]Error running tool: {str(e)}[/red]")
+            self.console.print(traceback.format_exc())
 
     def verify_paths(self) -> bool:
         """Verify that required paths exist."""
@@ -242,7 +250,7 @@ class ToolsManager:
 
     def run(self):
         """Main execution method."""
-        self.clear_screen()
+        # self.clear_screen()
         if not self.verify_paths():
             return
     

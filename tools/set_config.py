@@ -9,6 +9,7 @@ import os
 import sys
 import termios
 import tty
+import shutil
 from contextlib import contextmanager
 from pathlib import Path
 from typing import Dict, Any, Optional, List, Tuple, Union
@@ -199,7 +200,7 @@ class ConfigEditor:
         
         with raw_mode(sys.stdin):
             key = sys.stdin.read(1)
-            if key == '\r':  # Enter - Save changes
+            if key == '\r' or key == '\n':  # Enter - Save changes
                 self.console.print("Yes")
                 self.save_changes(config_path)
                 save_confirmed = True
@@ -370,43 +371,111 @@ class ConfigEditor:
         self.handle_save_and_rename(config_path)
 
     def save_changes(self, config_path: Path) -> None:
-        """Save the current configuration"""
+        """Save the current configuration."""
+        if not config_path.exists():
+            self.console.print(f"[red]Config file not found: {config_path}[/red]")
+            return
+
         try:
+            # Load existing config
             with open(config_path, 'r') as f:
-                config = json.load(f)
-            
+                try:
+                    config = json.load(f)
+                except json.JSONDecodeError:
+                    self.console.print(f"[red]Invalid JSON format in file: {config_path}[/red]")
+                    return
+
+            # Update config with parameter values
             for param in self.parameters.values():
-                if param['type'] == 'float':
-                    config[param['config_key']] = float(param['value'])
-                elif param['type'] == 'int':
-                    config[param['config_key']] = int(param['value'])
-                elif param['type'] == 'bool':
-                    config[param['config_key']] = param['value'].lower() == 'true'
-                else:
-                    config[param['config_key']] = param['value']
-            
-            with open(config_path, 'w') as f:
-                json.dump(config, f, indent=4)
-            self.console.print("[green]Config saved successfully![/green]")
+                if 'config_key' not in param:
+                    self.console.print(f"[yellow]Skipping parameter with missing config_key: {param}[/yellow]")
+                    continue
+                try:
+                    if param['type'] == 'float':
+                        config[param['config_key']] = float(param['value'])
+                    elif param['type'] == 'int':
+                        config[param['config_key']] = int(param['value'])
+                    elif param['type'] == 'bool':
+                        config[param['config_key']] = param['value'].lower() == 'true'
+                    else:
+                        config[param['config_key']] = param['value']
+                except ValueError:
+                    self.console.print(f"[red]Invalid value for {param['config_key']}: {param['value']}[/red]")
+
+            # Write updated config back to file
+            try:
+                with open(config_path, 'w') as f:
+                    json.dump(config, f, indent=4)
+                self.console.print("[green]Config saved successfully![/green]")
+            except OSError as e:
+                self.console.print(f"[red]Failed to save config: {str(e)}[/red]")
+
         except Exception as e:
             self.console.print(f"[red]Error saving config: {str(e)}[/red]")
 
     def handle_rename(self, config_path: Path) -> None:
-        """Handle the rename operation"""
+        """Handle the rename operation by renaming the folder and updating the config."""
         current_name = config_path.parent.name
         self.console.print(f"\nCurrent name: {current_name}")
-        new_name = self.console.input("Enter new name: ").strip()
         
+        new_name = self.console.input("Enter new name: ").strip()
+
         if new_name and new_name != current_name:
             if self.validate_new_name(new_name):
                 try:
-                    new_path = config_path.parent.parent / new_name
-                    config_path.parent.rename(new_path)
-                    self.console.print(f"[green]Successfully renamed to {new_name}[/green]")
+                    old_folder = config_path.parent
+                    new_folder = old_folder.parent / new_name
+
+                    # Check if the new folder name already exists
+                    if new_folder.exists():
+                        self.console.print(f"[red]Error: Folder '{new_name}' already exists.[/red]")
+                        return
+
+                    # Rename the folder
+                    old_folder.rename(new_folder)
+                    self.console.print(f"[green]Successfully renamed folder to '{new_name}'.[/green]")
+
+                    # Update the config file in the renamed folder
+                    config_file = new_folder / 'config.json'
+                    self.edit_config_family(new_name, config_file)
+
                 except Exception as e:
-                    self.console.print(f"[red]Error during rename: {str(e)}[/red]")
+                    self.console.print(f"[red]Error during rename operation: {str(e)}[/red]")
             else:
-                self.console.print("[red]Invalid name format or name already exists[/red]")
+                self.console.print("[red]Invalid name format or name already exists.[/red]")    
+
+    def edit_config_family(self, new_folder_name: str, config_path: Path):
+        # Extract components from the new folder name
+        try:
+            # Example: "gala-01" -> name="gala", version="01"
+            name, version = new_folder_name.split('-')
+        except ValueError:
+            raise ValueError("Invalid folder name format. Expected format: 'name-version' (e.g., 'gala-01')")
+
+        # Load the existing config.json file
+        try:
+            with open(config_path, 'r') as file:
+                config = json.load(file)
+        except FileNotFoundError:
+            print(f"Config file not found at: {config_path}")
+            return
+        except json.JSONDecodeError:
+            print(f"Failed to parse config file. Ensure it's valid JSON: {config_path}")
+            return
+
+        # Update the specific keys
+        config["--instance_prompt"] = name
+        config["--user_prompt_library"] = f"config/{new_folder_name}/user_prompt_library.json"
+        config["--data_backend_config"] = f"config/{new_folder_name}/multidatabackend.json"
+        config["--output_dir"] = f"output/{name}/{version}"
+
+        # Save the updated config back to the file
+        try:
+            with open(config_path, 'w') as file:
+                json.dump(config, file, indent=4)
+            print(f"Config updated successfully: {config_path}")
+        except Exception as e:
+            print(f"Failed to save updated config: {e}")
 
     def validate_new_name(self, new_name: str) -> bool:
         """Validate the new config name"""
