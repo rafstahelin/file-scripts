@@ -12,7 +12,7 @@ A specialized tool for managing prompt libraries in SimpleTuner configurations t
 
 ## Directory Structure
 ```bash
-/workspace/file-scripts/
+/workspace/SimpleTuner/
 └── prompts/
     ├── templates/         # Template prompts with tokens
     │   └── *.json        # JSON files containing template prompts
