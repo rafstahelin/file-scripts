@@ -50,13 +50,13 @@ class ToolsManager:
         self.tool_categories = {
             "Training": [
                 ("train", "train", "OK"),
+                ("train_daisy", "train daisy", "OK"),
                 ('set_config', 'Set Config', 'OK'),
                 ('set_prompts', 'Set Prompts', 'OK'),
-                ('config_manager', 'Config Manager', 'in dev')
+                ('config_manager', 'Config Manager', 'OK')
             ],
             "File Management": [
                 ('lora_mover', 'LoRA Mover', 'OK'),
-                ('lora_sync', 'LoRA Sync', 'in dev'),
                 ('metadata_reader', 'Metadata Reader', 'OK'),
                 ('download_configs', 'Download Configs', 'OK')
             ],
@@ -75,7 +75,7 @@ class ToolsManager:
             ],
             "Utilities": [
                 ('setup', 'Setup', 'OK'),
-                ('create_prompt_group', 'Create Prompt Group', 'in dev')
+                ('create_prompt_group', 'Create Prompt Group', 'OK')
             ]
         }
 
@@ -248,63 +248,37 @@ class ToolsManager:
 
     def clear_screen(self):
         """Clear terminal screen."""
-       # os.system('clear' if os.name == 'posix' else 'cls')
+        os.system('clear' if os.name == 'posix' else 'cls')
 
     def run(self):
         """Main execution method."""
-        # self.clear_screen()
         if not self.verify_paths():
             return
-    
+
         while True:
             try:
                 self.clear_screen()
                 self.display_menu()
                 
-                with raw_mode(sys.stdin):
-                    buffer = ""
-                    last_key_time = None
-                    
-                    while True:
-                        import select
-                        import time
-                        
-                        # Check for input with timeout
-                        if select.select([sys.stdin], [], [], 1.0)[0]:  # 1 second timeout
-                            key = sys.stdin.read(1)
-                            
-                            if not key or key == '\x1b':  # Empty or Escape
-                                self.console.print("\n[yellow]Exiting File Management Tools...[/yellow]")
-                                return
-                                
-                            if key == '\r' or key == '\n':  # Enter
-                                if buffer:  # Process accumulated input
-                                    tool_name = self.get_tool_by_input(buffer)
-                                    if tool_name:
-                                        self.clear_screen()
-                                        self.run_tool(tool_name)
-                                        break
-                                else:  # Empty Enter
-                                    self.console.print("\n[yellow]Exiting File Management Tools...[/yellow]")
-                                    return
-                                    
-                            if key.isdigit():
-                                buffer += key
-                                last_key_time = time.time()
-                        
-                        # Check if timeout elapsed since last keypress
-                        elif buffer and last_key_time and (time.time() - last_key_time) > 0.3:
-                            tool_name = self.get_tool_by_input(buffer)
-                            if tool_name:
-                                self.clear_screen()
-                                self.run_tool(tool_name)
-                                break
-                            buffer = ""  # Reset buffer if invalid selection
-                            
+                user_input = Prompt.ask("\n[cyan]Enter a tool number or press Enter to quit: [/cyan]").strip()
+                
+                if not user_input:  # Empty input -> quit
+                    self.console.print("[yellow]Exiting File Management Tools...[/yellow]")
+                    return
+
+                tool_name = self.get_tool_by_input(user_input)
+                if tool_name:
+                    self.clear_screen()
+                    self.run_tool(tool_name)
+                else:
+                    self.console.print("[red]Invalid input. Please enter a valid tool number.[/red]")
+                    input("Press Enter to try again...")
+
             except Exception as e:
                 self.console.print(f"[red]Unexpected error: {str(e)}[/red]")
                 self.console.print(traceback.format_exc())
                 input("\nPress Enter to continue...")
+
 
 if __name__ == "__main__":
     try:
