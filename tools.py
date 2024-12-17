@@ -50,12 +50,13 @@ class ToolsManager:
         self.tool_categories = {
             "Training": [
                 ("train", "train", "OK"),
-                ('set_config', 'Set Config', 'in dev'),
-                ('set_prompts', 'Set Prompts', 'in dev'),
+                ('set_config', 'Set Config', 'OK'),
+                ('set_prompts', 'Set Prompts', 'OK'),
                 ('config_manager', 'Config Manager', 'in dev')
             ],
             "File Management": [
                 ('lora_mover', 'LoRA Mover', 'OK'),
+                ('lora_sync', 'LoRA Sync', 'in dev'),
                 ('metadata_reader', 'Metadata Reader', 'OK'),
                 ('download_configs', 'Download Configs', 'OK')
             ],
@@ -247,7 +248,7 @@ class ToolsManager:
 
     def clear_screen(self):
         """Clear terminal screen."""
-        os.system('clear' if os.name == 'posix' else 'cls')
+       # os.system('clear' if os.name == 'posix' else 'cls')
 
     def run(self):
         """Main execution method."""
