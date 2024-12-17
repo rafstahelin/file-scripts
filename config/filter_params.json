@@ -1,0 +1,26 @@
+{
+    "config.json": [
+        "instance_prompt",
+        "webhook_config",
+        "flux_lora_target",
+        "lr_scheduler",
+        "learning_rate",
+        "train_batch_size",
+        "lora_rank",
+        "max_train_steps",
+        "checkpointing_steps",
+        "checkpoints_total_limit",
+        "lr_warmup_steps",
+        "adam_weight_decay",
+        "gradient_accumulation_steps",
+        "max_grad_norm",
+        "use_ema",
+        "ema_decay",
+        "ema_update_interval"
+    ],
+    "multidatabackend.json": {
+        "1536" : ["repeats", "instance_data_dir"],
+        "1024" : ["repeats", "instance_data_dir"],
+        "512" : ["repeats", "instance_data_dir"]
+    }
+}
