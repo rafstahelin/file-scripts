@@ -8,20 +8,84 @@ from rich.prompt import Prompt
 from rich import print as rprint
 import json
 import traceback
-from safetensors.torch import safe_open
 from .base_tool import BaseTool
+
+# Try to import just the core safetensors functionality
+try:
+    from safetensors import safe_open
+    SAFETENSORS_AVAILABLE = True
+except ImportError:
+    SAFETENSORS_AVAILABLE = False
 
 class MetadataReader:
     def __init__(self):
         self.console = Console()
-        self.base_path = Path('/workspace/StableSwarmUI/Models/loras/flux')
+        self.base_path = Path('/workspace/ComfyUI/models/loras/flux')
+        
+        if not SAFETENSORS_AVAILABLE:
+            rprint("[yellow]Warning: safetensors not available. Please install with: pip install safetensors[/yellow]")
 
     def verify_paths(self) -> bool:
         """Verify that base path exists."""
         if not self.base_path.exists():
             rprint(f"[red]Error: Directory {self.base_path} does not exist[/red]")
+            rprint("[yellow]Note: Make sure ComfyUI is properly mounted and the loras directory exists[/yellow]")
             return False
         return True
+
+    def list_model_paths(self) -> List[str]:
+        """Get unique model paths from safetensors files."""
+        try:
+            # Get all unique model directories
+            model_paths = set()
+            
+            # Use rglob (recursive glob) to find all safetensors files
+            for file in self.base_path.rglob("*.safetensors"):
+                # Get the model path (parent directory)
+                model_path = file.parent.relative_to(self.base_path)
+                model_paths.add(str(model_path))
+            
+            if not model_paths:
+                rprint("[yellow]No models found[/yellow]")
+                return []
+                
+            rprint("[cyan]Available Models:[/cyan]")
+            return self._display_items_in_panels(sorted(model_paths), "Available Models")
+        except Exception as e:
+            rprint(f"[red]Error scanning models: {str(e)}[/red]")
+            return []
+
+    def list_model_versions(self, model_path: str) -> List[str]:
+        """List safetensors files for a specific model."""
+        try:
+            path = self.base_path / model_path
+            versions = [f.name for f in path.glob("*.safetensors")]
+            
+            if not versions:
+                rprint(f"[yellow]No versions found for model {model_path}[/yellow]")
+                return []
+                
+            rprint(f"\n[cyan]Available Versions for {model_path}:[/cyan]")
+            return self._display_items_in_panels(versions, f"Available Versions for {model_path}")
+        except Exception as e:
+            rprint(f"[red]Error scanning versions: {str(e)}[/red]")
+            return []
+
+    def read_metadata(self, file_path: Path) -> Optional[Dict]:
+        """Read metadata from a safetensors file."""
+        if not SAFETENSORS_AVAILABLE:
+            rprint("[red]Error: safetensors module not available.[/red]")
+            rprint("[yellow]Please install with: pip install safetensors[/yellow]")
+            return None
+        
+        try:
+            # Use framework="raw" to avoid torch dependency
+            with safe_open(file_path, framework="raw") as f:
+                metadata = dict(f.metadata())
+                return metadata
+        except Exception as e:
+            rprint(f"[red]Error reading metadata from {file_path.name}: {str(e)}[/red]")
+            return None
 
     def _display_items_in_panels(self, items: List[str], title: str) -> List[str]:
         """Display items in panels, with special handling for versions."""
@@ -84,53 +148,33 @@ class MetadataReader:
 
             return ordered_items
 
-    def list_model_paths(self) -> List[str]:
-        """Get unique model paths from safetensors files."""
+    def display_metadata(self, metadata: Dict) -> None:
+        """Display complete formatted metadata with colors."""
         try:
-            # Get all unique model directories
-            model_paths = set()
+            # Parse the complete configurations
+            config_data = json.loads(metadata.get('complete_config', '{}'))
+            backend_data = json.loads(metadata.get('complete_backend', '{}'))
             
-            # Use rglob (recursive glob) to find all safetensors files
-            for file in self.base_path.rglob("*.safetensors"):
-                # Get the model path (parent directory)
-                model_path = file.parent.relative_to(self.base_path)
-                model_paths.add(str(model_path))
+            # Format both configurations with colors
+            config_section = self._format_json_with_colors(config_data)
+            backend_section = self._format_json_with_colors(backend_data)
             
-            if not model_paths:
-                rprint("[yellow]No models found[/yellow]")
-                return []
-                
-            rprint("[cyan]Available Models:[/cyan]")
-            return self._display_items_in_panels(sorted(model_paths), "Available Models")
-        except Exception as e:
-            rprint(f"[red]Error scanning models: {str(e)}[/red]")
-            return []
-
-    def list_model_versions(self, model_path: str) -> List[str]:
-        """List safetensors files for a specific model."""
-        try:
-            path = self.base_path / model_path
-            versions = [f.name for f in path.glob("*.safetensors")]
+            content = (
+                f"[bold cyan]Complete Configuration:[/bold cyan]\n{config_section}\n\n"
+                f"[bold cyan]Complete Backend Configuration:[/bold cyan]\n{backend_section}"
+            )
             
-            if not versions:
-                rprint(f"[yellow]No versions found for model {model_path}[/yellow]")
-                return []
-                
-            rprint(f"\n[cyan]Available Versions for {model_path}:[/cyan]")
-            return self._display_items_in_panels(versions, f"Available Versions for {model_path}")
+            panel = Panel.fit(
+                content,
+                title="[bold magenta]Safetensors Metadata[/bold magenta]",
+                border_style="blue",
+                padding=(1, 2)
+            )
+            self.console.print(panel)
+            
         except Exception as e:
-            rprint(f"[red]Error scanning versions: {str(e)}[/red]")
-            return []
-
-    def read_metadata(self, file_path: Path) -> Optional[Dict]:
-        """Read metadata from a safetensors file."""
-        try:
-            with safe_open(file_path, framework="pt", device="cpu") as f:
-                metadata = dict(f.metadata())
-                return metadata
-        except Exception as e:
-            rprint(f"[red]Error reading metadata: {str(e)}[/red]")
-            return None
+            rprint(f"[red]Error displaying metadata: {str(e)}[/red]")
+            self.console.print(traceback.format_exc())
 
     def _format_value(self, value: Any) -> str:
         """Format a value with appropriate color."""
@@ -189,35 +233,6 @@ class MetadataReader:
             
         return "\n".join(lines)
 
-    def display_metadata(self, metadata: Dict) -> None:
-        """Display complete formatted metadata with colors."""
-        try:
-            # Parse the complete configurations
-            config_data = json.loads(metadata.get('complete_config', '{}'))
-            backend_data = json.loads(metadata.get('complete_backend', '{}'))
-            
-            # Format both configurations with colors
-            config_section = self._format_json_with_colors(config_data)
-            backend_section = self._format_json_with_colors(backend_data)
-            
-            content = (
-                f"[bold cyan]Complete Configuration:[/bold cyan]\n{config_section}\n\n"
-                f"[bold cyan]Complete Backend Configuration:[/bold cyan]\n{backend_section}"
-            )
-            
-            panel = Panel.fit(
-                content,
-                title="[bold magenta]Safetensors Metadata[/bold magenta]",
-                border_style="blue",
-                padding=(1, 2)
-            )
-            self.console.print(panel)
-            
-        except Exception as e:
-            rprint(f"[red]Error displaying metadata: {str(e)}[/red]")
-            self.console.print(traceback.format_exc())
-
-
 class Tool(BaseTool):
     def __init__(self):
         super().__init__()
@@ -226,13 +241,32 @@ class Tool(BaseTool):
         
     def process(self):
         """Main process implementation."""
+        if not SAFETENSORS_AVAILABLE:
+            self.clear_screen()
+            rprint("[magenta]=== Metadata Reader Tool ===[/magenta]\n")
+            rprint("[red]This tool requires safetensors to be installed.[/red]")
+            rprint("[yellow]Please install with: pip install safetensors[/yellow]")
+            Prompt.ask("\nPress Enter to exit")
+            self.exit_tool()
+            return
+
         while True:
             self.clear_screen()
             rprint("[magenta]=== Metadata Reader Tool ===[/magenta]\n")
             
             if not self.reader.verify_paths():
-                return
-            
+                if self.get_yes_no_input("Would you like to create the required directory structure?"):
+                    try:
+                        self.reader.base_path.mkdir(parents=True, exist_ok=True)
+                        rprint("[green]Directory structure created successfully![/green]")
+                    except Exception as e:
+                        rprint(f"[red]Error creating directories: {str(e)}[/red]")
+                        self.exit_tool()
+                        return
+                else:
+                    self.exit_tool()
+                    return
+
             # List and select model
             model_paths = self.reader.list_model_paths()
             if not model_paths:
@@ -273,7 +307,6 @@ class Tool(BaseTool):
             except Exception as e:
                 rprint(f"[red]Error: {str(e)}[/red]")
                 Prompt.ask("\nPress Enter to continue")
-
 
 if __name__ == "__main__":
     tool = Tool()

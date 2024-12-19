@@ -12,14 +12,25 @@ from rich.columns import Columns
 from rich import print as rprint
 from rich.prompt import Prompt
 from .base_tool import BaseTool
-from .metadata_handler import MetadataHandler
+
+try:
+    from .metadata_handler import MetadataHandler
+    METADATA_AVAILABLE = True
+except ImportError:
+    METADATA_AVAILABLE = False
+    rprint("[yellow]Warning: MetadataHandler not available - metadata features will be disabled[/yellow]")
 
 class LoRaMover:
     def __init__(self):
         self.console = Console()
         self.base_path = Path.cwd()
-        self.destination_base = Path('/workspace/StableSwarmUI/Models/loras/flux')
-        self.metadata_handler = MetadataHandler()
+        self.destination_base = Path('/workspace/ComfyUI/models/loras/flux')
+        self.metadata_handler = None
+        if METADATA_AVAILABLE:
+            try:
+                self.metadata_handler = MetadataHandler()
+            except Exception as e:
+                rprint(f"[yellow]Warning: Failed to initialize MetadataHandler: {str(e)}[/yellow]")
 
     def clear_screen(self):
         """Clear terminal screen."""
@@ -221,46 +232,54 @@ class LoRaMover:
             rprint(f"[red]Error during Dropbox sync: {str(e)}[/red]")
 
     def process_safetensors(self, source_path: Path, dest_path: Path, 
-                          model_name: str, version: str) -> int:
-        """Process and copy safetensors files with proper naming."""
-        try:
-            processed_count = 0
-            
-            # Get metadata once for all checkpoints
-            metadata = self.metadata_handler.create_metadata(model_name, version)
-            if metadata:
-                self.console.print("[cyan]Extracted training configuration[/cyan]")
-            
-            checkpoints = [d for d in source_path.iterdir() if d.is_dir() 
-                          and d.name.startswith('checkpoint-')]
-            
-            for checkpoint_dir in checkpoints:
-                step_count = checkpoint_dir.name.split('-')[1]
-                step_count = str(int(step_count)).zfill(5)
+                            model_name: str, version: str) -> int:
+            """Process and copy safetensors files with proper naming."""
+            try:
+                processed_count = 0
                 
-                source_file = checkpoint_dir / "pytorch_lora_weights.safetensors"
-                if source_file.exists():
-                    new_filename = f"{model_name}-{version}-{step_count}.safetensors"
-                    dest_file = dest_path / new_filename
+                # Only try to get metadata if handler is available
+                metadata = None
+                if self.metadata_handler:
+                    try:
+                        metadata = self.metadata_handler.create_metadata(model_name, version)
+                        if metadata:
+                            self.console.print("[cyan]Extracted training configuration[/cyan]")
+                    except Exception as e:
+                        rprint(f"[yellow]Warning: Metadata extraction failed: {str(e)}[/yellow]")
+                
+                checkpoints = [d for d in source_path.iterdir() if d.is_dir() 
+                            and d.name.startswith('checkpoint-')]
+                
+                for checkpoint_dir in checkpoints:
+                    step_count = checkpoint_dir.name.split('-')[1]
+                    step_count = str(int(step_count)).zfill(5)
                     
-                    # Create destination directory if it doesn't exist
-                    dest_file.parent.mkdir(parents=True, exist_ok=True)
-                    
-                    # Update metadata if available
-                    if metadata:
-                        self.console.print(f"[cyan]Updating metadata for checkpoint {step_count}...[/cyan]")
-                        if not self.metadata_handler.update_safetensors_metadata(source_file, metadata):
-                            self.console.print("[yellow]Warning: Failed to update metadata[/yellow]")
-                    
-                    # Copy the file
-                    shutil.copy2(source_file, dest_file)
-                    processed_count += 1
-                    rprint(f"[green]Copied: {new_filename}[/green]")
-                    
-            return processed_count
-        except Exception as e:
-            rprint(f"[red]Error processing safetensors: {str(e)}[/red]")
-            return 0
+                    source_file = checkpoint_dir / "pytorch_lora_weights.safetensors"
+                    if source_file.exists():
+                        new_filename = f"{model_name}-{version}-{step_count}.safetensors"
+                        dest_file = dest_path / new_filename
+                        
+                        # Create destination directory if it doesn't exist
+                        dest_file.parent.mkdir(parents=True, exist_ok=True)
+                        
+                        # Update metadata only if both handler and metadata are available
+                        if self.metadata_handler and metadata:
+                            try:
+                                self.console.print(f"[cyan]Updating metadata for checkpoint {step_count}...[/cyan]")
+                                if not self.metadata_handler.update_safetensors_metadata(source_file, metadata):
+                                    self.console.print("[yellow]Warning: Failed to update metadata[/yellow]")
+                            except Exception as e:
+                                self.console.print(f"[yellow]Warning: Metadata update failed: {str(e)}[/yellow]")
+                        
+                        # Copy the file
+                        shutil.copy2(source_file, dest_file)
+                        processed_count += 1
+                        rprint(f"[green]Copied: {new_filename}[/green]")
+                        
+                return processed_count
+            except Exception as e:
+                rprint(f"[red]Error processing safetensors: {str(e)}[/red]")
+                return 0
 
     def process_single_version(self):
         """Handle processing of a single model version."""
@@ -389,7 +408,7 @@ class Tool(BaseTool):
         self.tool_name = "LoRA Model Management Tool"
         self.mover = LoRaMover()
         self.mover.base_path = self.workspace_path / 'SimpleTuner/output'
-        self.mover.destination_base = self.workspace_path / 'StableSwarmUI/Models/loras/flux'
+        self.mover.destination_base = self.workspace_path / 'ComfyUI/models/loras/flux'
         
     def process(self):
         """Main process implementation."""
