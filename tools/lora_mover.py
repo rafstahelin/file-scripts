@@ -159,12 +159,12 @@ class LoRaMover:
             return ordered_items
 
     def sync_to_dropbox(self, model_path: str, is_single_version: bool = False) -> None:
-        """Sync processed files to Dropbox using rclone with simplified progress."""
+        """Sync processed files to local Dropbox using rclone."""
         try:
             rprint("\n[cyan]Starting Dropbox synchronization...[/cyan]")
             
             source_path = str(self.destination_base / model_path)
-            base_destination = "dbx:/studio/ai/libs/SD/loras/flux"
+            base_destination = "dbx:/studio/ai/libs/diffusion-models/models/loras/flux"
             destination = f"{base_destination}/{model_path}"
             
             # First, get list of files to be transferred
@@ -176,6 +176,9 @@ class LoRaMover:
                 "-R"
             ]
             
+            rprint(f"[cyan]Source path: {source_path}[/cyan]")
+            rprint(f"[cyan]Destination path: {destination}[/cyan]")
+            
             files_to_transfer = subprocess.check_output(cmd_check, 
                                                       universal_newlines=True).splitlines()
             
@@ -185,7 +188,80 @@ class LoRaMover:
                 
             rprint(f"[yellow]Found {len(files_to_transfer)} files to process[/yellow]")
             
-            # Run transfer with simpler progress tracking
+            # Run transfer with progress tracking
+            cmd = [
+                "rclone",
+                "copy",
+                "--checksum",
+                source_path,
+                destination,
+                "--ignore-existing",
+                "-P"
+            ]
+            
+            with Progress(
+                TextColumn("[bold blue]{task.description}"),
+                BarColumn(complete_style="green"),
+                TaskProgressColumn(),
+                console=self.console,
+                transient=True
+            ) as progress:
+                task = progress.add_task(f"[cyan]Uploading {model_path}", total=100)
+                
+                process = subprocess.Popen(
+                    cmd,
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.STDOUT,
+                    universal_newlines=True
+                )
+                
+                # Monitor process output for progress
+                for line in process.stdout:
+                    rprint(f"[cyan]{line.strip()}[/cyan]")
+                    progress.update(task, advance=1)
+                
+                # Ensure process completes
+                process.wait()
+                
+                if process.returncode == 0:
+                    progress.update(task, completed=100)
+                    rprint("\n[green]Dropbox synchronization completed successfully![/green]")
+                else:
+                    rprint("\n[red]Error during Dropbox synchronization[/red]")
+                    
+        except Exception as e:
+            rprint(f"[red]Error during Dropbox sync: {str(e)}[/red]")
+
+        """Sync processed files to local Dropbox using rclone."""
+        try:
+            rprint("\n[cyan]Starting Dropbox synchronization...[/cyan]")
+            
+            source_path = str(self.destination_base / model_path)
+            base_destination = "E:/studio Dropbox/studio/ai/libs/diffusion-models/models/loras/flux"
+            destination = f"{base_destination}/{model_path}"
+            
+            # First, get list of files to be transferred
+            cmd_check = [
+                "rclone",
+                "lsf",
+                source_path,
+                "--files-only",
+                "-R"
+            ]
+            
+            rprint(f"[cyan]Source path: {source_path}[/cyan]")
+            rprint(f"[cyan]Destination path: {destination}[/cyan]")
+            
+            files_to_transfer = subprocess.check_output(cmd_check, 
+                                                      universal_newlines=True).splitlines()
+            
+            if not files_to_transfer:
+                rprint("[yellow]No files to transfer[/yellow]")
+                return
+                
+            rprint(f"[yellow]Found {len(files_to_transfer)} files to process[/yellow]")
+            
+            # Run transfer with progress tracking
             cmd = [
                 "rclone",
                 "copy",
@@ -231,6 +307,63 @@ class LoRaMover:
         except Exception as e:
             rprint(f"[red]Error during Dropbox sync: {str(e)}[/red]")
 
+        """Sync processed files to local Dropbox directory."""
+        try:
+            rprint("\n[cyan]Starting local Dropbox synchronization...[/cyan]")
+            
+            source_path = Path(self.destination_base / model_path)
+            base_destination = Path("E:/studio Dropbox/studio/ai/libs/diffusion-models/models/loras/flux")
+            destination = base_destination / model_path
+            
+            # Create destination directory if it doesn't exist
+            destination.mkdir(parents=True, exist_ok=True)
+            
+            rprint(f"[cyan]Source path: {source_path}[/cyan]")
+            rprint(f"[cyan]Destination path: {destination}[/cyan]")
+            
+            # Get list of files to transfer
+            files_to_transfer = list(source_path.rglob("*.safetensors"))
+            
+            if not files_to_transfer:
+                rprint("[yellow]No files to transfer[/yellow]")
+                return
+                
+            rprint(f"[yellow]Found {len(files_to_transfer)} files to process[/yellow]")
+            
+            with Progress(
+                TextColumn("[bold blue]{task.description}"),
+                BarColumn(complete_style="green"),
+                TaskProgressColumn(),
+                console=self.console,
+                transient=True
+            ) as progress:
+                task = progress.add_task(f"[cyan]Copying {model_path}", total=len(files_to_transfer))
+                
+                for file in files_to_transfer:
+                    try:
+                        # Construct destination path maintaining relative structure
+                        rel_path = file.relative_to(source_path)
+                        dest_file = destination / rel_path
+                        
+                        # Create parent directories if needed
+                        dest_file.parent.mkdir(parents=True, exist_ok=True)
+                        
+                        # Copy file if it doesn't exist or has different size
+                        if not dest_file.exists() or file.stat().st_size != dest_file.stat().st_size:
+                            rprint(f"[yellow]Copying: {file} -> {dest_file}[/yellow]")
+                            shutil.copy2(file, dest_file)
+                            rprint(f"[green]Copied: {file.name}[/green]")
+                            
+                        progress.update(task, advance=1)
+                        
+                    except Exception as e:
+                        rprint(f"[red]Error copying {file.name}: {str(e)}[/red]")
+                
+                progress.update(task, completed=len(files_to_transfer))
+                rprint("\n[green]Local Dropbox synchronization completed successfully![/green]")
+                    
+        except Exception as e:
+            rprint(f"[red]Error during local Dropbox sync: {str(e)}[/red]")
     def process_safetensors(self, source_path: Path, dest_path: Path, 
                             model_name: str, version: str) -> int:
             """Process and copy safetensors files with proper naming."""
