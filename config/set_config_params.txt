@@ -1,7 +1,16 @@
 model_type
 flux_lora_target
+lr_scheduler
 learning_rate
+lr_end
+lr_power
 train_batch_size
+max_train_steps
+num_train_epochs
+checkpointing_steps
+resume_from_checkpoint
+checkpoints_total_limit
+lr_warmup_steps
 webhook_config
 lora_rank
 use_ema

@@ -4,7 +4,7 @@
         "--user_prompt_library": null,
         "--data_backend_config": null,
         "--output_dir": null,
-        "--webhook_config": ["webhooks/webhook-1.json", "webhooks/webhook-2.json", "webhooks/webhook-3.json", "webhooks/webhook-4.json"]
+        "--webhook_config": ["webhooks/1.json", "webhooks/2.json", "webhooks/3.json", "webhooks/4.json"]
     },
 
     "model_settings": {
@@ -18,13 +18,15 @@
 
     "training_parameters": {
         "--train_batch_size": [1, 2, 4, 8],
-        "--max_train_steps": [1000, 2000, 5000],
+        "--max_train_steps": [1000, 2000, 3000, 4000, 5000],
         "--num_train_epochs": [0, 5, 10, 20],
         "--gradient_accumulation_steps": [1, 2, 4, 8],
         "--learning_rate": [1e-5, 1e-4, 2e-4],
         "--lr_scheduler": ["constant", "constant_with_warmup", "cosine", "cosine_with_restarts", "polynomial", "linear"],
+        "--lr_end": [1e-4, 5e-5],
+        "--lr_power": [0, 0.5, 1.0],
         "--lr_warmup_steps": [0, 20, 50, 100],
-        "--max_grad_norm": [0.1, 1.0],
+        "--max_grad_norm": [0.01, 0.1, 1.0],
         "--snr_gamma": [0, 5, 10],
         "--caption_dropout_probability": [0.0, 0.001, 0.01, 0.1]
     },

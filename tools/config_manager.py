@@ -772,11 +772,14 @@ class ConfigEditor:
         table = Table(show_header=False, box=None, padding=(0, 2))
         table.add_column("Parameter", style="cyan", width=30)
         table.add_column("Value", style="white", width=20)
+        table.add_column("Parameter", style="cyan", width=30)
+        table.add_column("Value", style="white", width=20)
         
         params = list(self.parameters.items())
-        mid_point = (len(params) + 1) // 2
-        
-        for i in range(max(len(params[:mid_point]), len(params[mid_point:]))):
+        mid_point = (len(params) + 1) // 2  # Split parameters into two groups
+
+        # Iterate over the full range of parameters, splitting into left and right columns
+        for i in range(len(params)):
             left = params[i] if i < mid_point else None
             right = params[i + mid_point] if i + mid_point < len(params) else None
             
@@ -793,13 +796,14 @@ class ConfigEditor:
                     str(left[1]['value']) if left[1]['value'] else "",
                     "", ""
                 )
-    
+
         return Panel(
             table,
             title=f"[gold1]Parameter Settings - {self.current_config}[/gold1]",
             border_style="blue",
             padding=(1, 1)
         )
+
 
     def handle_save_and_rename(self, config_path: Path) -> None:
         self.console.print("\nSave changes? (Enter=Yes, Esc=No): ", end="")

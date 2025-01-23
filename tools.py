@@ -57,6 +57,8 @@ class ToolsManager:
             ],
             "File Management": [
                 ('lora_mover', 'LoRA Mover', 'OK'),
+                ('lora_mover EMA', 'LoRA Mover EMA', 'dev'),
+                ('lora_sync', 'LoRA Sync', 'in dev'),
                 ('metadata_reader', 'Metadata Reader', 'OK'),
                 ('download_configs', 'Download Configs', 'OK')
             ],
@@ -248,7 +250,7 @@ class ToolsManager:
 
     def clear_screen(self):
         """Clear terminal screen."""
-        os.system('clear' if os.name == 'posix' else 'cls')
+        # os.system('clear' if os.name == 'posix' else 'cls')
 
     def run(self):
         """Main execution method."""
