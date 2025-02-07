@@ -10,14 +10,43 @@ from rich.table import Table
 from rich.panel import Panel
 from time import sleep
 
+class Tool:
+    def __init__(self):
+        print("Debug: Initializing Tool wrapper")
+        try:
+            self.console = Console()
+            print("Debug: Console initialized")
+            self.tool = ValidationGridTool()
+            print("Debug: ValidationGridTool initialized")
+        except Exception as e:
+            print(f"Error in Tool initialization: {str(e)}")
+            traceback.print_exc()
+            raise
+    
+    def run(self):
+        print("Debug: Tool.run() started")
+        try:
+            self.tool.run()
+        except Exception as e:
+            print(f"Error in tool.run(): {str(e)}")
+            traceback.print_exc()
+            input("Press Enter to continue...")  # Added pause
+            raise
+
 class ValidationGridTool:
     def __init__(self):
+        print("Debug: Initializing ValidationGridTool")  # Debug line
         self.console = Console()
         
         # Initialize paths
-        self.workspace_path = Path('/workspace/SimpleTuner')
+        self.workspace_path = Path('/workspace/SimpleTuner')  # Changed from SimpleTrainer
         self.output_path = self.workspace_path / 'output'
         self.config_path = self.workspace_path / 'config'
+        
+        print(f"Debug: Paths initialized:")  # Debug line
+        print(f"Debug: workspace_path = {self.workspace_path}")
+        print(f"Debug: output_path = {self.output_path}")
+        print(f"Debug: config_path = {self.config_path}")
         
         # Grid layout parameters
         self.top_margin = 240
@@ -179,6 +208,7 @@ class ValidationGridTool:
             
         except Exception as e:
             self.console.print(f"[red]Error creating grid: {str(e)}[/red]")
+            traceback.print_exc()
             return None
 
     def save_grid(self, grid_image: Image.Image, model: str, version: str) -> bool:
@@ -194,11 +224,24 @@ class ValidationGridTool:
             
         except Exception as e:
             self.console.print(f"[red]Error saving grid: {str(e)}[/red]")
+            traceback.print_exc()
             return False
 
     def run(self):
+        """Main execution method with debug logging"""
         while True:
             try:
+                print("Debug: Starting run loop")  # Debug line
+                
+                # Verify paths exist
+                if not self.output_path.exists():
+                    print(f"Error: Output path does not exist: {self.output_path}")
+                    return
+                    
+                if not self.config_path.exists():
+                    print(f"Error: Config path does not exist: {self.config_path}")
+                    return
+                
                 # Clear screen at start of each loop
                 os.system('clear' if os.name == 'posix' else 'cls')
                 self.console.print("[cyan]Loading tool: validation_grid[/cyan]")
@@ -285,22 +328,10 @@ class ValidationGridTool:
                 
             except Exception as e:
                 self.console.print(f"[red]An error occurred: {str(e)}[/red]")
+                traceback.print_exc()
                 sleep(1.5)
+                input("Press Enter to continue...")  # Added pause
                 continue
-
-class Tool:
-    def __init__(self):
-        self.console = Console()
-        self.console.print("[cyan]Loading tool: validation_grid[/cyan]")
-        print()  # Add space after loading message
-        self.tool = ValidationGridTool()
-    
-    def run(self):
-        try:
-            self.tool.run()
-        except Exception as e:
-            self.console.print(f"[red]Error running tool: {str(e)}[/red]")
-            sleep(1.5)
 
 if __name__ == "__main__":
     tool = Tool()

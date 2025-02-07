@@ -51,18 +51,19 @@ class ToolsManager:
             "Training": [
                 ("train", "train", "OK"),
                 ("train_daisy", "train daisy", "OK"),
-                ('set_config', 'Set Config', 'OK'),
+                ('set_config', 'Set Config', 'fix'),
                 ('set_prompts', 'Set Prompts', 'OK'),
                 ('config_manager', 'Config Manager', 'OK')
             ],
             "File Management": [
-                ('lora_mover', 'LoRA Mover', 'OK'),
-                ('metadata_reader', 'Metadata Reader', 'OK'),
-                ('download_configs', 'Download Configs', 'OK')
+                ('lora_mover', 'LoRA Mover', 'fix: doesnt dl to dbx'),
+                ('lora_sync', 'LoRA Sync', 'fix'),
+                ('metadata_reader', 'Metadata Reader', 'fix'),
+                ('download_configs', 'Download Configs', 'fix')
             ],
             "Dev Tools": [
-                ('validation_grid', 'Validation Grid', 'OK'),
-                ('dataset_grid', 'Dataset Grid', 'OK'),
+                ('validation_grid', 'Validation Grid', 'fix- cli ok'),
+                ('dataset_grid', 'Dataset Grid', 'fix - cli ok'),
                 ('dataset_captions', 'Dataset Captions', 'OK'),
                 ('debug_crops', 'Debug Crops', '-')
             ],
@@ -74,7 +75,7 @@ class ToolsManager:
                 ('remove_checkpoints', 'Remove Checkpoints', 'OK')
             ],
             "Utilities": [
-                ('setup', 'Setup', 'OK'),
+                ('setup', 'Setup', 'OK-needs optimisation'),
                 ('create_prompt_group', 'Create Prompt Group', 'OK')
             ]
         }
@@ -248,7 +249,7 @@ class ToolsManager:
 
     def clear_screen(self):
         """Clear terminal screen."""
-        os.system('clear' if os.name == 'posix' else 'cls')
+        # os.system('clear' if os.name == 'posix' else 'cls')
 
     def run(self):
         """Main execution method."""

@@ -1,3 +1,5 @@
+#  copy dbx not working double... 20250130 ...
+
 import os
 import shutil
 import time
@@ -25,12 +27,16 @@ class LoRaMover:
         self.console = Console()
         self.base_path = Path.cwd()
         self.destination_base = Path('/workspace/ComfyUI/models/loras/flux')
+<<<<<<< HEAD
         self.metadata_handler = None
         if METADATA_AVAILABLE:
             try:
                 self.metadata_handler = MetadataHandler()
             except Exception as e:
                 rprint(f"[yellow]Warning: Failed to initialize MetadataHandler: {str(e)}[/yellow]")
+=======
+        self.metadata_handler = MetadataHandler()
+>>>>>>> main
 
     def clear_screen(self):
         """Clear terminal screen."""
@@ -159,13 +165,18 @@ class LoRaMover:
             return ordered_items
 
     def sync_to_dropbox(self, model_path: str, is_single_version: bool = False) -> None:
+<<<<<<< HEAD
         """Sync processed files to local Dropbox using rclone."""
+=======
+>>>>>>> main
         try:
-            rprint("\n[cyan]Starting Dropbox synchronization...[/cyan]")
-            
             source_path = str(self.destination_base / model_path)
+<<<<<<< HEAD
             base_destination = "dbx:/studio/ai/libs/diffusion-models/models/loras/flux"
             destination = f"{base_destination}/{model_path}"
+=======
+            destination = f"dbx:/studio/ai/libs/diffusion-models/models/loras/flux/{model_path}"
+>>>>>>> main
             
             # First, get list of files to be transferred
             cmd_check = [
@@ -307,6 +318,7 @@ class LoRaMover:
         except Exception as e:
             rprint(f"[red]Error during Dropbox sync: {str(e)}[/red]")
 
+<<<<<<< HEAD
         """Sync processed files to local Dropbox directory."""
         try:
             rprint("\n[cyan]Starting local Dropbox synchronization...[/cyan]")
@@ -390,11 +402,41 @@ class LoRaMover:
                     source_file = checkpoint_dir / "pytorch_lora_weights.safetensors"
                     if source_file.exists():
                         new_filename = f"{model_name}-{version}-{step_count}.safetensors"
+=======
+    def process_safetensors(self, source_path: Path, dest_path: Path, 
+                            model_name: str, version: str) -> int:
+            """Process and copy safetensors files with proper naming."""
+            try:
+                processed_count = 0
+                
+                # Construct the full model path for metadata
+                full_model_path = f"{model_name}_{version}"
+                
+                # Get metadata once for all checkpoints
+                metadata = self.metadata_handler.create_metadata(full_model_path)
+                if metadata:
+                    self.console.print("[cyan]Extracted training configuration[/cyan]")
+                else:
+                    self.console.print("[yellow]Warning: Could not extract metadata[/yellow]")
+                
+                checkpoints = [d for d in source_path.iterdir() if d.is_dir() 
+                            and d.name.startswith('checkpoint-')]
+                
+                for checkpoint_dir in sorted(checkpoints):
+                    step_count = checkpoint_dir.name.split('-')[1]
+                    step_count = str(int(step_count)).zfill(5)
+                    
+                    source_file = checkpoint_dir / "pytorch_lora_weights.safetensors"
+                    if source_file.exists():
+                        new_filename = f"{model_name}-{version}-{step_count}.safetensors"
+                        # version_path = dest_path / model_name / version  # Creates /flux/amodelmelia/version_number/
+>>>>>>> main
                         dest_file = dest_path / new_filename
                         
                         # Create destination directory if it doesn't exist
                         dest_file.parent.mkdir(parents=True, exist_ok=True)
                         
+<<<<<<< HEAD
                         # Update metadata only if both handler and metadata are available
                         if self.metadata_handler and metadata:
                             try:
@@ -406,12 +448,30 @@ class LoRaMover:
                         
                         # Copy the file
                         shutil.copy2(source_file, dest_file)
+=======
+                        # Copy the file first
+                        shutil.copy2(source_file, dest_file)
+                        
+                        # Update metadata if available
+                        if metadata:
+                            if self.metadata_handler.update_safetensors_metadata(dest_file, metadata):
+                                self.console.print(f"[green]Updated metadata for {new_filename}[/green]")
+                            else:
+                                self.console.print(f"[yellow]Warning: Failed to update metadata for {new_filename}[/yellow]")
+                        
+>>>>>>> main
                         processed_count += 1
                         rprint(f"[green]Copied: {new_filename}[/green]")
                         
                 return processed_count
             except Exception as e:
                 rprint(f"[red]Error processing safetensors: {str(e)}[/red]")
+<<<<<<< HEAD
+=======
+                if self.console.is_debug:
+                    import traceback
+                    rprint(f"[dim]{traceback.format_exc()}[/dim]")
+>>>>>>> main
                 return 0
 
     def process_single_version(self):

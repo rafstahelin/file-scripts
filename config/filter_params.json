@@ -19,8 +19,13 @@
         "ema_update_interval"
     ],
     "multidatabackend.json": {
-        "1536" : ["repeats", "instance_data_dir"],
-        "1024" : ["repeats", "instance_data_dir"],
-        "512" : ["repeats", "instance_data_dir"]
+        "lora-512" : ["repeats", "instance_data_dir", "crop_aspect", "crop_aspect_buckets", "resolution_type", "disabled"],
+        "lora-512-loss": ["instance_data_dir", "crop_aspect", "crop_aspect_buckets", "resolution_type", "disabled"],
+        "lora-768": ["repeats", "instance_data_dir", "crop_aspect", "crop_aspect_buckets", "resolution_type", "disabled"],
+        "lora-768-loss": ["instance_data_dir", "crop_aspect", "crop_aspect_buckets", "resolution_type", "disabled"],
+        "lora-1024" : ["repeats", "instance_data_dir", "crop_aspect", "crop_aspect_buckets", "resolution_type", "disabled"],
+        "lora-1024-loss": ["instance_data_dir", "crop_aspect", "crop_aspect_buckets", "resolution_type", "disabled"],
+        "lora-1536" : ["repeats", "instance_data_dir", "crop_aspect", "crop_aspect_buckets", "resolution_type", "disabled"],
+        "lora-1536-loss": ["instance_data_dir", "crop_aspect", "crop_aspect_buckets", "resolution_type", "disabled"],
     }
 }
