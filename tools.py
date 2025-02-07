@@ -56,14 +56,14 @@ class ToolsManager:
                 ('config_manager', 'Config Manager', 'OK')
             ],
             "File Management": [
-                ('lora_mover', 'LoRA Mover', 'fix: doesnt dl to dbx'),
-                ('lora_sync', 'LoRA Sync', 'fix'),
+                ('lora_mover', 'LoRA Mover', 'OK'),
+                ('lora_sync', 'LoRA Sync', 'OK'),
                 ('metadata_reader', 'Metadata Reader', 'fix'),
-                ('download_configs', 'Download Configs', 'fix')
+                ('download_configs', 'Download Configs', 'now')
             ],
             "Dev Tools": [
-                ('validation_grid', 'Validation Grid', 'fix- cli ok'),
-                ('dataset_grid', 'Dataset Grid', 'fix - cli ok'),
+                ('validation_grid', 'Validation Grid', 'OK'),
+                ('dataset_grid', 'Dataset Grid', 'OK'),
                 ('dataset_captions', 'Dataset Captions', 'OK'),
                 ('debug_crops', 'Debug Crops', '-')
             ],
