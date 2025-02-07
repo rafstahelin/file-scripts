@@ -11,5 +11,4 @@ venv/
 .ipynb_checkpoints/
 **/.ipynb_checkpoints/
 *-Copy1.py
-tools-current.py
-tools/set_config-current.py
+
