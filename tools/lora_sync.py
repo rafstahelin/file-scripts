@@ -45,7 +45,7 @@ class LoRaMover:
         logging.info("Console initialized")
         self.base_path = Path.cwd()
         logging.info(f"Base path set to: {self.base_path}")
-        self.destination_base = Path('/workspace/StableSwarmUI/Models/loras/flux')
+        self.destination_base = Path('/workspace/ComfyUI/models/loras/flux')
         logging.info(f"Destination base set to: {self.destination_base}")
         self.metadata_handler = MetadataHandler()
         logging.info("Metadata handler initialized")
@@ -362,6 +362,90 @@ class LoRaMover:
 
     def process_all_versions(self):
         """Handle processing of all versions for a selected model."""
+    model_paths = self.list_model_paths()
+    if not model_paths:
+        return
+
+    model_num = Prompt.ask("\nEnter number to select model path").strip()
+    if not model_num:
+        rprint("[red]Exited--no input given[/red]")
+        return
+
+    try:
+        selected_model = model_paths[int(model_num) - 1]
+    except (ValueError, IndexError):
+        rprint("[red]Invalid selection[/red]")
+        return
+
+    model_path = self.base_path / selected_model
+    versions = [d.name for d in model_path.iterdir() if d.is_dir() and d.name != '.ipynb_checkpoints']
+
+    if not versions:
+        rprint(f"[yellow]No versions found for model {selected_model}[/yellow]")
+        return
+
+    total_processed = 0
+    rprint(f"\n[cyan]Processing all versions of {selected_model}...[/cyan]")
+
+    for version in sorted(versions, reverse=True):
+        source_path = model_path / version
+        dest_path = self.destination_base / selected_model / version
+
+        rprint(f"[yellow]Processing version {version}...[/yellow]")
+        files_processed = self.process_safetensors(source_path, dest_path, selected_model, version)
+        total_processed += files_processed
+
+    if total_processed > 0:
+        self.show_progress("Processing complete", 100)
+        rprint(f"[green]Successfully processed {total_processed} files across all versions![/green]")
+        self.sync_to_dropbox(selected_model, is_single_version=False)
+    else:
+        rprint("[yellow]No files were processed[/yellow]")
+
+        """Handle processing of all versions for a selected model."""
+    model_paths = self.list_model_paths()
+    if not model_paths:
+        return
+
+    model_num = Prompt.ask("\nEnter number to select model path").strip()
+    if not model_num:
+        rprint("[red]Exited--no input given[/red]")
+        return
+
+    try:
+        selected_model = model_paths[int(model_num) - 1]
+    except (ValueError, IndexError):
+        rprint("[red]Invalid selection[/red]")
+        return
+
+    model_path = self.base_path / selected_model
+    versions = [d.name for d in model_path.iterdir() if d.is_dir() and d.name != '.ipynb_checkpoints']
+
+    if not versions:
+        rprint(f"[yellow]No versions found for model {selected_model}[/yellow]")
+        return
+
+    total_processed = 0
+    rprint(f"\n[cyan]Processing all versions of {selected_model}...[/cyan]")
+
+    for version in sorted(versions, reverse=True):
+        # Process versions in reverse order
+        source_path = model_path / version
+        dest_path = self.destination_base / selected_model / version
+
+        rprint(f"[yellow]Processing version {version}...[/yellow]")
+        files_processed = self.process_safetensaors(source_path, dest_path, selected_model, version)
+        total_processed += files_processed
+
+    if total_processed > 0:
+        self.show_progress("Processing complete", 100)
+        rprint(f"[green]Successfully processed {total_processed} files across all versions![/green]")
+        # Sync to Dropbox - for all versions, we sync the entire model directory
+        self.sync_to_dropbox(selected_model, is_single_version=False)
+    else:
+        rprint("[yellow]No files were processed[/yellow]")
+
+        """Handle processing of all versions for a selected model."""
         model_paths = self.list_model_paths()
         if not model_paths:
             return
@@ -394,7 +478,7 @@ class LoRaMover:
 
             rprint(f"[yellow]Processing version {version}...[/yellow]")
             files_processed = self.process_safetensors(source_path, dest_path, selected_model, version)
-            total_processed += files_processed
+            total_processed += files_processed   
     def verify_paths(self) -> bool:
             if total_processed > 0:
                 self.show_progress("Processing complete", 100)
@@ -402,7 +486,16 @@ class LoRaMover:
 
             # Sync to Dropbox - for all versions, we sync the entire model directory
             self.sync_to_dropbox(selected_model, is_single_version=False)
-        else:
+            else:
+            rprint("[yellow]No files were processed[/yellow]")
+
+            if total_processed > 0:
+                self.show_progress("Processing complete", 100)
+                rprint(f"[green]Successfully processed {total_processed} files across all versions![/green]")
+
+            # Sync to Dropbox - for all versions, we sync the entire model directory
+            self.sync_to_dropbox(selected_model, is_single_version=False)
+            else:
             rprint("[yellow]No files were processed[/yellow]")
 
     def run(self):
