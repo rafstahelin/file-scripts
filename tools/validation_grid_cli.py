@@ -1,3 +1,8 @@
+# Script to create a validation grid from model output images
+# Run with: python script.py --model <model_name> --version <version_number>
+# Expects images in: /workspace/SimpleTuner/output/<model>/<version>/validation_images/
+# Saves grid to: /workspace/SimpleTuner/config/<model>-<version>/
+
 import argparse
 from pathlib import Path
 from PIL import Image, ImageDraw, ImageFont
