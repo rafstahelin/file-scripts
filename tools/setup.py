@@ -129,49 +129,34 @@ class Tool:
             return False
 
     def setup_dependencies(self):
-        """Install required system and Python packages."""
-        self.console.print("\n[bold blue]Setting up dependencies...[/]")
-        
-        try:
-            # First install system dependencies if in RunPod
-            if self.is_runpod:
-                system_deps = [
-                    "apt-get update",
-                    "apt-get install -y jq"  # Add jq installation
+            """Install required Python packages."""
+            self.console.print("\n[bold blue]Setting up dependencies...[/]")
+            
+            try:
+                # Install dependencies with proper version specifiers
+                dependencies = [
+                    "rich>=10.0.0",
+                    "requests>=2.25.1",
+                    "tqdm>=4.65.0",
+                    "safetensors",
+                    "tiktoken>=0.8.0",
+                    "regex>=2022.1.18"  # Required by tiktoken
                 ]
                 
-                for cmd in system_deps:
-                    success, output = self._run_command(cmd)
+                for dep in dependencies:
+                    success, output = self._run_command(f"python -m pip install '{dep}'")
                     if not success:
-                        self.console.print(f"[red]Failed to run system command {cmd}:[/]\n{output}")
+                        self.console.print(f"[red]Failed to install {dep}:[/]\n{output}")
                         return False
                     if self.debug_mode:
-                        self.console.print(f"[dim]Ran system command: {cmd}[/dim]")
+                        self.console.print(f"[dim]Installed {dep}[/]")
             
-            # Then install Python dependencies
-            python_deps = [
-                "rich>=10.0.0",
-                "requests>=2.25.1",
-                "tqdm>=4.65.0",
-                "safetensors",
-                "tiktoken>=0.8.0",
-                "regex>=2022.1.18"  # Required by tiktoken
-            ]
-            
-            for dep in python_deps:
-                success, output = self._run_command(f"python -m pip install '{dep}'")
-                if not success:
-                    self.console.print(f"[red]Failed to install {dep}:[/]\n{output}")
-                    return False
-                if self.debug_mode:
-                    self.console.print(f"[dim]Installed {dep}[/]")
-        
-            self.console.print("[green]✓[/] All dependencies installed")
-            return True
-            
-        except Exception as e:
-            self.console.print(f"[red]Error installing dependencies:[/]\n{str(e)}")
-            return False
+                self.console.print("[green]✓[/] All dependencies installed")
+                return True
+                
+            except Exception as e:
+                self.console.print(f"[red]Error installing dependencies:[/]\n{str(e)}")
+                return False
 
     def setup_rclone(self):
         """Configure rclone if config file is present."""
