@@ -8,6 +8,7 @@ from rich.panel import Panel
 from rich.columns import Columns
 from rich import print as rprint
 
+
 class Tool:
     def __init__(self):
         self.console = Console()
@@ -41,6 +42,7 @@ class Tool:
             return None
 
     def find_matching_dropbox_folder(self, base_name: str) -> Optional[str]:
+        """Find a matching Dropbox folder for a given base name."""
         result = self._run_rclone_command([
             "lsf", self.dropbox_base,
             "--dirs-only",
@@ -52,23 +54,21 @@ class Tool:
             return None
 
         matches = []
+        base_name_lower = base_name.lower()
+
         for folder in result.splitlines():
-            folder = folder.strip('/')
-            if not folder:
+            folder_cleaned = folder.strip('/')
+            if not folder_cleaned:
                 continue
-                
-            score = 0
-            folder_lower = folder.lower()
-            base_name_lower = base_name.lower()
+
+            folder_lower = folder_cleaned.lower()
             
-            if base_name_lower in folder_lower:
-                score += 10
-                if any(c.isdigit() for c in folder):
-                    score += 5
-                matches.append((score, folder))
+            if base_name_lower in folder_lower:  # Case-insensitive match
+                score = 10 + (5 if any(c.isdigit() for c in folder_cleaned) else 0)
+                matches.append((score, folder_cleaned))
 
         if matches:
-            matches.sort(key=lambda x: (-x[0], len(x[1])))
+            matches.sort(key=lambda x: (-x[0], len(x[1])))  # Sort by score and shortest length
             best_match = matches[0][1]
             rprint(f"[cyan]Found matching Dropbox folder: {best_match}[/cyan]")
             return best_match
@@ -77,13 +77,16 @@ class Tool:
         return None
 
     def download_config(self, source_path: Path, base_name: str) -> bool:
+        """Download a single config file to its corresponding Dropbox folder."""
         dropbox_folder = self.find_matching_dropbox_folder(base_name)
         if not dropbox_folder:
             return False
 
+        # Construct destination path dynamically
         dest_path = f"{self.dropbox_base}/{dropbox_folder}/4training/config/{source_path.name}"
-        dest_path = dest_path.replace('//', '/')
+        dest_path = dest_path.replace('//', '/')  # Ensure no double slashes
 
+        # Create the target directory in Dropbox
         mkdir_result = self._run_rclone_command([
             "mkdir",
             f"{self.dropbox_base}/{dropbox_folder}/4training/config"
@@ -93,6 +96,8 @@ class Tool:
             return False
 
         rprint(f"[cyan]Copying {source_path.name} to {dest_path}[/cyan]")
+        
+        # Copy the file to Dropbox
         copy_result = self._run_rclone_command([
             "copy",
             "--checksum",
@@ -108,24 +113,6 @@ class Tool:
             return True
         return False
 
-    def download_config_group(self, base_name: str) -> bool:
-        dropbox_folder = self.find_matching_dropbox_folder(base_name)
-        if not dropbox_folder:
-            return False
-
-        configs = list(self.base_path.glob(f"{base_name}-*"))
-        if not configs:
-            rprint(f"[yellow]No configs found matching {base_name}[/yellow]")
-            return False
-
-        success = True
-        for config in configs:
-            if not self.download_config(config, base_name):
-                success = False
-                rprint(f"[red]Failed to download {config.name}[/red]")
-
-        return success
-
     def get_config_dirs(self) -> List[Path]:
         try:
             return [
@@ -136,50 +123,19 @@ class Tool:
             rprint(f"[red]Error scanning config directory: {str(e)}[/red]")
             return []
 
-    def display_configs(self, configs: List[Path]) -> List:
+    def display_families(self, configs: List[Path]) -> Tuple[List[str], Dict[str, List[Path]]]:
+        """Group configurations by families and display them."""
         grouped = {}
         for config in sorted(configs, key=lambda x: x.name):
-            base_name = config.name.split('-')[0]
+            base_name = config.name.split('_')[0].lower()  # Group by base name (case-insensitive)
             grouped.setdefault(base_name, []).append(config)
 
-        panels = []
-        ordered_configs = []
-        counter = 1
-        
-        for base_name, group_configs in sorted(grouped.items()):
-            table = Table(show_header=False, show_edge=False, box=None, padding=(0,1))
-            table.add_column(justify="left", no_wrap=False, overflow='fold', max_width=30)
-            
-            table.add_row(f"[yellow]{counter}. {base_name} all[/yellow]")
-            ordered_configs.append(("group", base_name, group_configs))
-            counter += 1
-            
-            for config in sorted(group_configs, key=lambda x: x.name):
-                table.add_row(f"[yellow]{counter}. {config.name}[/yellow]")
-                ordered_configs.append(("single", config.name, config))
-                counter += 1
-                
-            panels.append(Panel(table, title=f"[magenta]{base_name}[/magenta]", 
-                              border_style="blue", width=36))
+        families = sorted(grouped.keys())
+        self.console.print("\n[bold yellow]Available Families[/bold yellow]")
+        for idx, family in enumerate(families, start=1):
+            self.console.print(f"[yellow]{idx}.[/yellow] {family}")
 
-        panels_per_row = 3
-        for i in range(0, len(panels), panels_per_row):
-            row_panels = panels[i:i + panels_per_row]
-            self.console.print(Columns(row_panels, equal=True, expand=True))
-
-        return ordered_configs
-
-    def process_selection(self, selection: str, ordered_configs: List) -> tuple[Optional[str], Optional[Path]]:
-        try:
-            idx = int(selection) - 1
-            if 0 <= idx < len(ordered_configs):
-                entry_type, name, data = ordered_configs[idx]
-                return (entry_type, data if entry_type == "single" else name)
-            rprint("[red]Invalid selection[/red]")
-            return None, None
-        except ValueError:
-            rprint("[red]Invalid input[/red]")
-            return None, None
+        return families, grouped
 
     def clear_screen(self):
         os.system('clear' if os.name == 'posix' else 'cls')
@@ -196,28 +152,45 @@ class Tool:
             return
 
         while True:
-            rprint("\n[cyan]Available configurations:[/cyan]")
-            ordered_configs = self.display_configs(configs)
-
-            try:
-                selection = input("\nEnter config number to download (or press Enter to exit): ").strip()
-                if not selection:
-                    break
-
-                entry_type, data = self.process_selection(selection, ordered_configs)
-                if entry_type == "group":
-                    self.download_config_group(data)
-                elif entry_type == "single":
-                    base_name = data.name.split('-')[0]
-                    self.download_config(data, base_name)
-
-                input("\nPress Enter to continue...")
-                self.clear_screen()
-
-            except KeyboardInterrupt:
-                rprint("\n[yellow]Operation cancelled by user[/yellow]")
+            # Step 1: Display families
+            families, grouped_configs = self.display_families(configs)
+            
+            # Step 2: Prompt user to select a family
+            family_num = input("Select a family number (or press Enter to exit): ").strip()
+            
+            if not family_num:  # Exit if no input
                 break
-            except Exception as e:
-                rprint(f"[red]Error: {str(e)}[/red]")
+            
+            if not family_num.isdigit() or int(family_num) < 1 or int(family_num) > len(families):
+                rprint("[red]Invalid selection. Please try again.[/red]")
+                continue
+            
+            selected_family = families[int(family_num) - 1]
+
+            # Step 3: Show configurations within the selected family
+            while True:
+                self.console.print(f"\n[bold yellow]Configurations in {selected_family}[/bold yellow]")
+                configs_in_family = grouped_configs[selected_family]
+                
+                for idx, config in enumerate(configs_in_family, start=1):
+                    self.console.print(f"[yellow]{idx}.[/yellow] {config.name}")
+                
+                # Step 4: Prompt user to select a configuration or go back
+                config_num = input(
+                    "Enter configuration number to download (or press Enter to go back): "
+                ).strip()
+                
+                if not config_num:  # Go back to families list
+                    break
+                
+                if not config_num.isdigit() or int(config_num) < 1 or int(config_num) > len(configs_in_family):
+                    rprint("[red]Invalid selection. Please try again.[/red]")
+                    continue
+                
+                selected_config = configs_in_family[int(config_num) - 1]
+                base_name = selected_config.name.split('_')[0].lower()
+                
+                # Download the selected configuration
+                self.download_config(selected_config, base_name)
+                
                 input("\nPress Enter to continue...")
-                self.clear_screen()
