@@ -172,12 +172,39 @@ class Tool:
                 self.console.print("[yellow]Warning: rclone.conf not found in workspace[/]")
                 return True
 
-            shutil.copy2(rclone_src, rclone_dst)
-            self.console.print("[green]✓[/] Configured rclone")
+            # First check if config already exists and has dbx remote
+            if rclone_dst.exists():
+                with open(rclone_dst, 'r') as f:
+                    current_config = f.read()
+                    if '[dbx]' in current_config:
+                        self.console.print("[green]✓[/] Existing dbx configuration found")
+                        return True
+                    elif '[DEFAULT]' in current_config:
+                        # Replace DEFAULT with dbx
+                        new_config = current_config.replace('[DEFAULT]', '[dbx]')
+                        with open(rclone_dst, 'w') as f:
+                            f.write(new_config)
+                        self.console.print("[green]✓[/] Renamed DEFAULT remote to dbx")
+                        return True
+
+            # If no existing config or no dbx/DEFAULT remote, check source config
+            with open(rclone_src, 'r') as f:
+                new_config = f.read()
+                if '[DEFAULT]' in new_config:
+                    new_config = new_config.replace('[DEFAULT]', '[dbx]')
+
+            # Write the (possibly modified) config
+            with open(rclone_dst, 'w') as f:
+                f.write(new_config)
+
+            self.console.print("[green]✓[/] Configured rclone with dbx remote")
             return True
             
         except Exception as e:
             self.console.print(f"[red]Error configuring rclone:[/]\n{str(e)}")
+            if self.debug_mode:
+                import traceback
+                self.console.print(f"[dim]{traceback.format_exc()}[/]")
             return False
 
     def check_git_credentials(self):
