@@ -213,19 +213,47 @@ class ValidationGridTool:
 
     def save_grid(self, grid_image: Image.Image, model: str, version: str) -> bool:
         try:
-            save_dir = self.config_path / f"{model}-{version}"
+            # Construct the directory for saving files
+            save_dir = self.config_path / f"{model}_{version}"
             save_dir.mkdir(parents=True, exist_ok=True)
+
+            # Construct paths for high-res and low-res files
+            output_file = save_dir / f"{model}_{version}-validation_grid.jpg"
+            low_res_file = save_dir / f"{model}_{version}-validation_grid_lores.jpg"
+
+            # Save high-resolution grid
+            grid_image.save(output_file, 'JPEG', quality=95)
+
+            # Save low-resolution version
+            self.save_low_res_version(grid_image, low_res_file)
+
+            self.console.print(f"[green]Grid saved to: {output_file}[/green]")
+            self.console.print(f"[green]Low-res grid saved to: {low_res_file}[/green]")
             
-            output_path = save_dir / f"{model}-{version}-validation-grid.jpg"
-            grid_image.save(output_path, 'JPEG', quality=95)
-            
-            self.console.print(f"[green]Grid saved to: {output_path}[/green]")
             return True
-            
+
         except Exception as e:
             self.console.print(f"[red]Error saving grid: {str(e)}[/red]")
-            traceback.print_exc()
             return False
+
+    def save_low_res_version(self, image: Image.Image, output_path: Path):
+        """Save a lower-resolution version of an image with specific size constraints."""
+        max_longest_side = 8192
+        max_shortest_side = 4096
+
+        width, height = image.size
+
+        # Determine scaling factor to satisfy both constraints
+        scaling_factor = min(max_longest_side / max(width, height), max_shortest_side / min(width, height))
+
+        # Resize only if scaling is necessary
+        if scaling_factor < 1.0:
+            new_width = int(width * scaling_factor)
+            new_height = int(height * scaling_factor)
+            image = image.resize((new_width, new_height), Image.Resampling.LANCZOS)
+
+        # Save the resized image
+        image.save(output_path, 'JPEG', quality=95)
 
     def run(self):
         """Main execution method with debug logging"""
