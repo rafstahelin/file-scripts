@@ -15,17 +15,21 @@ class Tool:
         """Scan for available training configurations"""
         configs = {}
         skip_dirs = {'templates'}
-        
+
         for config_dir in self.config_path.iterdir():
             if config_dir.is_dir() and config_dir.name not in skip_dirs:
-                if any((config_dir / f"config{ext}").exists() 
-                      for ext in ['.json', '.toml', '.env']):
-                    base_name = config_dir.name.split('-')[0]
+                if any((config_dir / f"config{ext}").exists() for ext in ['.json', '.toml', '.env']):
+                    # Use both '-' and '_' as delimiters to find the base name
+                    base_name = config_dir.name.split('_')[0].split('-')[0]
+
                     if base_name not in configs:
                         configs[base_name] = []
+
                     configs[base_name].append(config_dir.name)
 
+        # Sort configurations within each group
         return {k: sorted(v) for k, v in sorted(configs.items())}
+
 
     def _create_config_panel(self, base_name, configs, start_number):
         """Create a panel for a group of configs"""
