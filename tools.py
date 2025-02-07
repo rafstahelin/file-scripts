@@ -59,7 +59,7 @@ class ToolsManager:
                 ('lora_mover', 'LoRA Mover', 'OK'),
                 ('lora_sync', 'LoRA Sync', 'OK'),
                 ('metadata_reader', 'Metadata Reader', 'fix'),
-                ('download_configs', 'Download Configs', 'now')
+                ('download_configs', 'Download Configs', 'OK')
             ],
             "Dev Tools": [
                 ('validation_grid', 'Validation Grid', 'OK'),
