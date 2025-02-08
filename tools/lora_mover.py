@@ -160,8 +160,8 @@ class LoRaMover:
 
             return ordered_items
 
-    def sync_to_dropbox(self, model_path: str, is_single_version: bool = False) -> None:
-        """Sync processed files to local Dropbox using rclone."""
+    def sync_to_dropbox(self, model_path: str) -> None:
+        """Sync processed files to Dropbox using rclone."""
         try:
             source_path = str(self.destination_base / model_path)
             base_destination = "dbx:/studio/ai/libs/diffusion-models/models/loras/flux"
@@ -180,7 +180,7 @@ class LoRaMover:
             rprint(f"[cyan]Destination path: {destination}[/cyan]")
             
             files_to_transfer = subprocess.check_output(cmd_check, 
-                                                      universal_newlines=True).splitlines()
+                                                    universal_newlines=True).splitlines()
             
             if not files_to_transfer:
                 rprint("[yellow]No files to transfer[/yellow]")
@@ -232,138 +232,6 @@ class LoRaMover:
         except Exception as e:
             rprint(f"[red]Error during Dropbox sync: {str(e)}[/red]")
 
-        """Sync processed files to local Dropbox using rclone."""
-        try:
-            rprint("\n[cyan]Starting Dropbox synchronization...[/cyan]")
-            
-            source_path = str(self.destination_base / model_path)
-            base_destination = "E:/studio Dropbox/studio/ai/libs/diffusion-models/models/loras/flux"
-            destination = f"{base_destination}/{model_path}"
-            
-            # First, get list of files to be transferred
-            cmd_check = [
-                "rclone",
-                "lsf",
-                source_path,
-                "--files-only",
-                "-R"
-            ]
-            
-            rprint(f"[cyan]Source path: {source_path}[/cyan]")
-            rprint(f"[cyan]Destination path: {destination}[/cyan]")
-            
-            files_to_transfer = subprocess.check_output(cmd_check, 
-                                                      universal_newlines=True).splitlines()
-            
-            if not files_to_transfer:
-                rprint("[yellow]No files to transfer[/yellow]")
-                return
-                
-            rprint(f"[yellow]Found {len(files_to_transfer)} files to process[/yellow]")
-            
-            # Run transfer with progress tracking
-            cmd = [
-                "rclone",
-                "copy",
-                "--checksum",
-                source_path,
-                destination,
-                "--ignore-existing",
-                "-P"
-            ]
-            
-            with Progress(
-                TextColumn("[bold blue]{task.description}"),
-                BarColumn(complete_style="green"),
-                TaskProgressColumn(),
-                console=self.console,
-                transient=True
-            ) as progress:
-                task = progress.add_task(f"[cyan]Uploading {model_path}", total=100)
-                
-                process = subprocess.Popen(
-                    cmd,
-                    stdout=subprocess.PIPE,
-                    stderr=subprocess.STDOUT,
-                    universal_newlines=True
-                )
-                
-                # Update progress in chunks
-                for _ in range(100):
-                    if process.poll() is not None:
-                        break
-                    progress.update(task, advance=1)
-                    time.sleep(0.1)
-                
-                # Ensure process completes
-                process.wait()
-                
-                if process.returncode == 0:
-                    progress.update(task, completed=100)
-                    rprint("\n[green]Dropbox synchronization completed successfully![/green]")
-                else:
-                    rprint("\n[red]Error during Dropbox synchronization[/red]")
-                    
-        except Exception as e:
-            rprint(f"[red]Error during Dropbox sync: {str(e)}[/red]")
-
-        """Sync processed files to local Dropbox directory."""
-        try:
-            rprint("\n[cyan]Starting local Dropbox synchronization...[/cyan]")
-            
-            source_path = Path(self.destination_base / model_path)
-            base_destination = Path("E:/studio Dropbox/studio/ai/libs/diffusion-models/models/loras/flux")
-            destination = base_destination / model_path
-            
-            # Create destination directory if it doesn't exist
-            destination.mkdir(parents=True, exist_ok=True)
-            
-            rprint(f"[cyan]Source path: {source_path}[/cyan]")
-            rprint(f"[cyan]Destination path: {destination}[/cyan]")
-            
-            # Get list of files to transfer
-            files_to_transfer = list(source_path.rglob("*.safetensors"))
-            
-            if not files_to_transfer:
-                rprint("[yellow]No files to transfer[/yellow]")
-                return
-                
-            rprint(f"[yellow]Found {len(files_to_transfer)} files to process[/yellow]")
-            
-            with Progress(
-                TextColumn("[bold blue]{task.description}"),
-                BarColumn(complete_style="green"),
-                TaskProgressColumn(),
-                console=self.console,
-                transient=True
-            ) as progress:
-                task = progress.add_task(f"[cyan]Copying {model_path}", total=len(files_to_transfer))
-                
-                for file in files_to_transfer:
-                    try:
-                        # Construct destination path maintaining relative structure
-                        rel_path = file.relative_to(source_path)
-                        dest_file = destination / rel_path
-                        
-                        # Create parent directories if needed
-                        dest_file.parent.mkdir(parents=True, exist_ok=True)
-                        
-                        # Copy file if it doesn't exist or has different size
-                        if not dest_file.exists() or file.stat().st_size != dest_file.stat().st_size:
-                            rprint(f"[yellow]Copying: {file} -> {dest_file}[/yellow]")
-                            shutil.copy2(file, dest_file)
-                            rprint(f"[green]Copied: {file.name}[/green]")
-                            
-                        progress.update(task, advance=1)
-                        
-                    except Exception as e:
-                        rprint(f"[red]Error copying {file.name}: {str(e)}[/red]")
-                
-                progress.update(task, completed=len(files_to_transfer))
-                rprint("\n[green]Local Dropbox synchronization completed successfully![/green]")
-                    
-        except Exception as e:
-            rprint(f"[red]Error during local Dropbox sync: {str(e)}[/red]")
     def process_safetensors(self, source_path: Path, dest_path: Path, 
                             model_name: str, version: str) -> int:
             """Process and copy safetensors files with proper naming."""
@@ -389,7 +257,8 @@ class LoRaMover:
                     
                     source_file = checkpoint_dir / "pytorch_lora_weights.safetensors"
                     if source_file.exists():
-                        new_filename = f"{model_name}-{version}-{step_count}.safetensors"
+                        # Use the version name directly from the config folder
+                        new_filename = f"{version}-{step_count}.safetensors"
                         dest_file = dest_path / new_filename
                         
                         # Create destination directory if it doesn't exist
@@ -459,7 +328,7 @@ class LoRaMover:
             
             # Sync to Dropbox - for single version, we use the full path including version
             sync_path = f"{selected_model}/{selected_version}"
-            self.sync_to_dropbox(sync_path, is_single_version=True)
+            self.sync_to_dropbox(sync_path)
         else:
             rprint("[yellow]No files were processed[/yellow]")
 
@@ -503,36 +372,36 @@ class LoRaMover:
             rprint(f"[green]Successfully processed {total_processed} files across all versions![/green]")
             
             # Sync to Dropbox - for all versions, we sync the entire model directory
-            self.sync_to_dropbox(selected_model, is_single_version=False)
+            self.sync_to_dropbox(selected_model)
         else:
             rprint("[yellow]No files were processed[/yellow]")
 
     def run(self):
-            """Main execution method."""
-            self.clear_screen()
+        """Main execution method."""
+        self.clear_screen()
+        
+        # Verify paths before proceeding
+        if not self.verify_paths():
+            return
             
-            # Verify paths before proceeding
-            if not self.verify_paths():
-                return
-                
-            rprint("[magenta]=== LoRA Model Management Tool ===[/magenta]")
-            
-            rprint("\n[cyan]Select processing mode:[/cyan]")
-            rprint("[yellow]1. Process single version[/yellow]")
-            rprint("[yellow]2. Process all versions of a model[/yellow]")
-            
-            choice = Prompt.ask("\nEnter choice").strip()
-            if not choice:
-                rprint("[red]Exited--no input given[/red]")
-                return
-            
-            if choice == "1":
-                self.process_single_version()
-            elif choice == "2":
-                self.process_all_versions()
-            else:
-                rprint("[red]Invalid choice[/red]")
-                return
+        rprint("[magenta]=== LoRA Model Management Tool ===[/magenta]")
+        
+        rprint("\n[cyan]Select processing mode:[/cyan]")
+        rprint("[yellow]1. Process single version[/yellow]")
+        rprint("[yellow]2. Process all versions of a model[/yellow]")
+        
+        choice = Prompt.ask("\nEnter choice").strip()
+        if not choice:
+            rprint("[red]Exited--no input given[/red]")
+            return
+        
+        if choice == "1":
+            self.process_single_version()
+        elif choice == "2":
+            self.process_all_versions()
+        else:
+            rprint("[red]Invalid choice[/red]")
+            return
 
 
 class Tool(BaseTool):
