@@ -57,6 +57,7 @@ class ToolsManager:
             ],
             "File Management": [
                 ('lora_mover', 'LoRA Mover', 'OK'),
+                ('lora_process', 'Lora Process', 'OK'),
                 ('lora_sync', 'LoRA Sync', 'OK'),
                 ('metadata_reader', 'Metadata Reader', 'fix'),
                 ('download_configs', 'Download Configs', 'OK')
