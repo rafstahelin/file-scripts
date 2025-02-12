@@ -96,27 +96,43 @@ class Tool:
                 self.console.print(f"[dim]{traceback.format_exc()}[/]")
             return False
 
-    def setup_git_config(self):
-        """Configure git credentials."""
-        self.console.print("\n[bold blue]Configuring git...[/]")
+    def setup_git_auth(self):
+        """Configure Git authentication using a Personal Access Token (PAT)."""
+        self.console.print("\n[bold blue]Configuring Git authentication...[/]")
         try:
-            git_configs = [
-                ('credential.helper', 'store'),
-                ('user.name', 'rafstahelin'),
-                ('user.email', 'raf@raf.studio')
-            ]
+            # Check if already configured
+            git_credentials = Path.home() / '.git-credentials'
+            if git_credentials.exists():
+                self.console.print("[green]✓[/] Git credentials already configured")
+                return True
+
+            # Get PAT from environment variable
+            pat = os.getenv('GITHUB_PAT')
+            if not pat:
+                self.console.print("[yellow]GITHUB_PAT not found in environment, skipping auth setup[/]")
+                return True
+
+            # Write credentials
+            with git_credentials.open('w') as f:
+                f.write(f"https://{pat}@github.com\n")
             
-            for key, value in git_configs:
-                success, output = self._run_command(f'git config --global {key} "{value}"')
-                if not success:
-                    self.console.print(f"[red]Failed to set {key}:[/]\n{output}")
-                    return False
-            
-            self.console.print("[green]✓[/] Git configured successfully")
+            # Set secure permissions
+            git_credentials.chmod(0o600)
+
+            # Enable credential helper
+            success, _ = self._run_command('git config --global credential.helper store')
+            if not success:
+                self.console.print("[red]Failed to configure credential helper[/]")
+                return False
+
+            self.console.print("[green]✓[/] Git authentication configured successfully")
             return True
-            
+
         except Exception as e:
-            self.console.print(f"[red]Error configuring git:[/]\n{str(e)}")
+            self.console.print(f"[red]Error configuring Git authentication:[/]\n{str(e)}")
+            if self.debug_mode:
+                import traceback
+                self.console.print(f"[dim]{traceback.format_exc()}[/]")
             return False
 
     def setup_tools_shortcut(self):
@@ -196,8 +212,8 @@ alias scripts='cd /workspace/file-scripts'
         
         steps = [
             (self.setup_dependencies, "Installing dependencies"),
+            (self.setup_git_auth, "Configuring Git authentication"),
             (self.setup_rclone, "Configuring rclone"),
-            (self.setup_git_config, "Configuring git"),
             (self.setup_tools_shortcut, "Setting up tools launcher"),
             (self.setup_wandb, "Configuring WANDB")
         ]
