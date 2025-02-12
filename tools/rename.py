@@ -85,9 +85,21 @@ class Tool:
 
     def update_json_file(self, file_path: Path, old_pattern: str, new_pattern: str, dry_run: bool = False) -> bool:
         """Update pattern references in JSON config files."""
+        if 'copy' in file_path.name or '.ipynb_checkpoints' in str(file_path):
+            return False
+            
         try:
-            with open(file_path, 'r') as f:
-                data = json.load(f)
+            try:
+                with open(file_path, 'r') as f:
+                    content = f.read()
+                    # Try to detect and fix common JSON issues
+                    content = content.strip()
+                    if not content:
+                        return False
+                    data = json.loads(content)
+            except json.JSONDecodeError as e:
+                self.console.print(f"[yellow]Skipping invalid JSON file {file_path}: {str(e)}[/yellow]")
+                return False
                 
             modified = False
             
@@ -125,6 +137,16 @@ class Tool:
         ]
         return any(pattern in str(path) for pattern in skip_patterns)
 
+    def clean_checkpoints(self, path: Path) -> None:
+        """Clean up .ipynb_checkpoints directories."""
+        for checkpoint_dir in path.rglob('.ipynb_checkpoints'):
+            try:
+                if checkpoint_dir.is_dir():
+                    shutil.rmtree(checkpoint_dir)
+                    self.console.print(f"[green]Removed checkpoint directory: {checkpoint_dir}[/green]")
+            except Exception as e:
+                self.console.print(f"[yellow]Could not remove checkpoint directory {checkpoint_dir}: {str(e)}[/yellow]")
+
     def process_directory(self, 
                          base_path: Path,
                          old_pattern: str, 
@@ -132,38 +154,83 @@ class Tool:
                          dry_run: bool = False) -> List[Tuple[Path, Path]]:
         """Process a directory tree for renames."""
         renames = []
+        directories = []
         
         try:
             # Extract prefix and version numbers
             old_prefix, old_version = old_pattern.split('-')
             new_prefix, new_version = new_pattern.split('_')
             
-            # Collect all paths that need renaming
+            # First pass: collect all paths
+            all_paths = []
             for path in base_path.rglob('*'):
-                if self.should_skip_path(path):
+                if path.name == '.ipynb_checkpoints':
                     continue
-                    
+                all_paths.append(path)
+            
+            # Sort paths by depth (deepest first)
+            all_paths.sort(key=lambda x: len(str(x).split(os.sep)), reverse=True)
+            
+            # Process files and directories separately
+            for path in all_paths:
                 path_str = str(path)
                 new_path_str = path_str
                 
                 # Handle different path patterns
-                if 'ComfyUI/models/loras/flux' in path_str:
-                    # Handle version number in directory structure
+                if 'ComfyUI/models/loras/flux' in path_str or '/SimpleTuner/output' in path_str:
+                    # First handle the version in path
                     new_path_str = re.sub(
-                        f"{old_prefix}/{old_version}",
-                        f"{new_prefix}/{new_version}",
+                        f"/{old_version}-",
+                        f"/{new_version}-",
+                        new_path_str
+                    )
+                    # Also handle potential old version without hyphen
+                    new_path_str = re.sub(
+                        f"/{old_version}/",
+                        f"/{new_version}/",
                         new_path_str
                     )
                 
                 # Handle the main pattern replacement
                 if old_pattern in new_path_str:
                     new_path_str = new_path_str.replace(old_pattern, new_pattern)
-                    
+                
                 if new_path_str != path_str:
-                    renames.append((path, Path(new_path_str)))
+                    if path.is_file():
+                        renames.append((path, Path(new_path_str)))
+                    else:
+                        directories.append((path, Path(new_path_str)))
             
-            # Sort by depth (deepest first) to handle nested paths correctly
-            renames.sort(key=lambda x: len(str(x[0]).split(os.sep)), reverse=True)
+            # If not dry run, execute renames
+            if not dry_run:
+                # Clean up checkpoint directories first
+                self.clean_checkpoints(base_path)
+                
+                # First rename all files
+                for old_path, new_path in renames:
+                    try:
+                        new_path.parent.mkdir(parents=True, exist_ok=True)
+                        old_path.rename(new_path)
+                        self.console.print(f"[green]Renamed: {old_path} → {new_path}[/green]")
+                    except Exception as e:
+                        self.console.print(f"[red]Error renaming {old_path}: {str(e)}[/red]")
+                
+                # Then handle directories (from deepest to shallowest)
+                for old_dir, new_dir in sorted(directories, key=lambda x: len(str(x[0]).split(os.sep)), reverse=True):
+                    try:
+                        if old_dir.exists():
+                            if not any(p for p in old_dir.iterdir() if p.name != '.ipynb_checkpoints'):
+                                # Remove any remaining .ipynb_checkpoints
+                                checkpoint_dir = old_dir / '.ipynb_checkpoints'
+                                if checkpoint_dir.exists():
+                                    shutil.rmtree(checkpoint_dir)
+                                # Now rename the directory
+                                old_dir.rename(new_dir)
+                                self.console.print(f"[green]Renamed directory: {old_dir} → {new_dir}[/green]")
+                    except Exception as e:
+                        self.console.print(f"[yellow]Note: Could not rename directory {old_dir}: {str(e)}[/yellow]")
+                        
+            return renames + directories
             
             if not dry_run:
                 # Execute renames
