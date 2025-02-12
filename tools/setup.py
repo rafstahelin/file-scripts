@@ -38,12 +38,14 @@ class Tool:
         self.console.print("\n[bold blue]Setting up dependencies...[/]")
         
         try:
+            self.console.print("[cyan]Installing system packages...[/]")
             # Install jq system package first
             success, output = self._run_command("apt-get update && apt-get install -y jq")
             if not success:
-                self.console.print("[red]Failed to install jq:[/]\n{output}")
+                self.console.print(f"[red]Failed to install jq:[/]\n{output}")
                 return False
             
+            self.console.print("[cyan]Installing Python packages...[/]")
             dependencies = [
                 "rich>=10.0.0",
                 "requests>=2.25.1",
@@ -53,11 +55,14 @@ class Tool:
                 "regex>=2022.1.18"
             ]
             
-            for dep in track(dependencies, description="Installing packages..."):
-                success, output = self._run_command(f"python -m pip install '{dep}' --quiet")
+            for dep in dependencies:
+                self.console.print(f"[dim]Installing {dep}...[/]")
+                success, output = self._run_command(f"python -m pip install '{dep}'")
                 if not success:
-                    self.console.print(f"[red]Failed to install {dep}:[/]\n{output}")
+                    self.console.print(f"[red]Failed to install {dep}:[/]")
+                    self.console.print(f"[red]Error output:[/]\n{output}")
                     return False
+                self.console.print(f"[green]✓[/] Installed {dep}")
         
             self.console.print("[green]✓[/] All dependencies installed")
             return True
@@ -89,6 +94,29 @@ class Tool:
             if self.debug_mode:
                 import traceback
                 self.console.print(f"[dim]{traceback.format_exc()}[/]")
+            return False
+
+    def setup_git_config(self):
+        """Configure git credentials."""
+        self.console.print("\n[bold blue]Configuring git...[/]")
+        try:
+            git_configs = [
+                ('credential.helper', 'store'),
+                ('user.name', 'rafstahelin'),
+                ('user.email', 'raf@raf.studio')
+            ]
+            
+            for key, value in git_configs:
+                success, output = self._run_command(f'git config --global {key} "{value}"')
+                if not success:
+                    self.console.print(f"[red]Failed to set {key}:[/]\n{output}")
+                    return False
+            
+            self.console.print("[green]✓[/] Git configured successfully")
+            return True
+            
+        except Exception as e:
+            self.console.print(f"[red]Error configuring git:[/]\n{str(e)}")
             return False
 
     def setup_tools_shortcut(self):
@@ -169,6 +197,7 @@ alias scripts='cd /workspace/file-scripts'
         steps = [
             (self.setup_dependencies, "Installing dependencies"),
             (self.setup_rclone, "Configuring rclone"),
+            (self.setup_git_config, "Configuring git"),
             (self.setup_tools_shortcut, "Setting up tools launcher"),
             (self.setup_wandb, "Configuring WANDB")
         ]
