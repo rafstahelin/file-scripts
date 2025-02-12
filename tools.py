@@ -73,7 +73,8 @@ class ToolsManager:
                 ('remove_configs', 'Remove Configs', 'OK'),
                 ('remove_dataset_cache', 'Remove Dataset Cache', 'OK'),
                 ('remove_dataset_json', 'Remove Dataset JSON', 'OK'),
-                ('remove_checkpoints', 'Remove Checkpoints', 'OK')
+                ('remove_checkpoints', 'Remove Checkpoints', 'OK'),
+                ('rename', 'rename', 'dev')
             ],
             "Utilities": [
                 ('setup', 'Setup', 'OK-needs optimisation'),

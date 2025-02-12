@@ -116,6 +116,15 @@ class Tool:
             self.console.print(f"[red]Error processing {file_path}: {str(e)}[/red]")
             return False
 
+    def should_skip_path(self, path: Path) -> bool:
+        """Determine if a path should be skipped during processing."""
+        skip_patterns = [
+            '.ipynb_checkpoints',
+            '__pycache__',
+            '.git'
+        ]
+        return any(pattern in str(path) for pattern in skip_patterns)
+
     def process_directory(self, 
                          base_path: Path,
                          old_pattern: str, 
@@ -125,12 +134,34 @@ class Tool:
         renames = []
         
         try:
+            # Extract prefix and version numbers
+            old_prefix, old_version = old_pattern.split('-')
+            new_prefix, new_version = new_pattern.split('_')
+            
             # Collect all paths that need renaming
             for path in base_path.rglob('*'):
-                if old_pattern in str(path):
-                    new_path = Path(str(path).replace(old_pattern, new_pattern))
-                    renames.append((path, new_path))
+                if self.should_skip_path(path):
+                    continue
                     
+                path_str = str(path)
+                new_path_str = path_str
+                
+                # Handle different path patterns
+                if 'ComfyUI/models/loras/flux' in path_str:
+                    # Handle version number in directory structure
+                    new_path_str = re.sub(
+                        f"{old_prefix}/{old_version}",
+                        f"{new_prefix}/{new_version}",
+                        new_path_str
+                    )
+                
+                # Handle the main pattern replacement
+                if old_pattern in new_path_str:
+                    new_path_str = new_path_str.replace(old_pattern, new_pattern)
+                    
+                if new_path_str != path_str:
+                    renames.append((path, Path(new_path_str)))
+            
             # Sort by depth (deepest first) to handle nested paths correctly
             renames.sort(key=lambda x: len(str(x[0]).split(os.sep)), reverse=True)
             
@@ -207,9 +238,15 @@ class Tool:
             return
 
         # Show summary
-        table = Table(title="Planned Renames")
-        table.add_column("From", style="cyan")
-        table.add_column("To", style="green")
+        table = Table(
+            title="Planned Renames",
+            show_header=True,
+            padding=(0,2),
+            show_edge=True,
+            expand=True
+        )
+        table.add_column("From", style="cyan", no_wrap=True, overflow="fold")
+        table.add_column("To", style="green", no_wrap=True, overflow="fold")
         
         for old_path, new_path in total_renames:
             table.add_row(str(old_path), str(new_path))
