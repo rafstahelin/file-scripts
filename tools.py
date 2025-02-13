@@ -90,7 +90,7 @@ class ToolsManager:
         return all_tools
 
     def display_shortcuts(self) -> None:
-        """Display shortcuts without numbering."""
+        """Display shortcuts without numbering with compact spacing."""
         shortcuts = [
             ('tools', 'Launch tools menu'),
             ('config', 'Navigate to configs directory'),
@@ -100,7 +100,7 @@ class ToolsManager:
             ('scripts', 'Navigate to scripts directory')
         ]
         
-        table = Table(show_header=False, box=None, show_edge=False, padding=(1, 1), width=55)
+        table = Table(show_header=False, box=None, show_edge=False, padding=(0, 1), width=55)
         table.add_column("Command", style="white", width=15)
         table.add_column("Description", style="white", width=40)
         
@@ -110,14 +110,11 @@ class ToolsManager:
                 description
             )
             
-        panel = Panel(table, title="[gold1]Shortcuts[/gold1]", border_style="blue", width=60, padding=(1, 1))
+        panel = Panel(table, title="[gold1]Shortcuts[/gold1]", border_style="blue", width=60, padding=(0, 1))
         self.console.print(panel)
-        print()
 
     def display_menu(self) -> None:
-        """Display categorized menu of available tools in two columns."""
-        print()
-        
+        """Display categorized menu of available tools in two columns with compact spacing."""
         # Split categories into two columns
         categories = list(self.tool_categories.items())
         mid_point = (len(categories) + 1) // 2
@@ -142,7 +139,7 @@ class ToolsManager:
             # Process left column
             if left_categories:
                 category_name, tools = left_categories.pop(0)
-                left_table = Table(show_header=False, box=None, show_edge=False, padding=(1, 1), width=55)
+                left_table = Table(show_header=False, box=None, show_edge=False, padding=(0, 1), width=55)
                 left_table.add_column("Tool", style="white", width=45)
                 left_table.add_column("Status", style="yellow", width=10)
                 
@@ -159,14 +156,14 @@ class ToolsManager:
                     title=f"[gold1]{category_name}[/gold1]",
                     border_style="blue",
                     width=60,
-                    padding=(1, 1)
+                    padding=(0, 1)
                 )
                 columns.append(left_panel)
             
             # Process right column
             if right_categories:
                 category_name, tools = right_categories.pop(0)
-                right_table = Table(show_header=False, box=None, show_edge=False, padding=(1, 1), width=55)
+                right_table = Table(show_header=False, box=None, show_edge=False, padding=(0, 1), width=55)
                 right_table.add_column("Tool", style="white", width=45)
                 right_table.add_column("Status", style="yellow", width=10)
                 
@@ -183,16 +180,14 @@ class ToolsManager:
                     title=f"[gold1]{category_name}[/gold1]",
                     border_style="blue",
                     width=60,
-                    padding=(1, 1)
+                    padding=(0, 1)
                 )
                 columns.append(right_panel)
             
             self.console.print(Columns(columns, equal=True, expand=True))
-            print()
-        
-        # Display shortcuts without numbering
-        self.display_shortcuts()
 
+        # Display shortcuts with reduced spacing
+        self.display_shortcuts()
 
     def get_tool_by_input(self, user_input: str) -> Optional[str]:
         """Get tool name from user input number."""
